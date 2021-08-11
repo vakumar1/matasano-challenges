@@ -47,11 +47,37 @@ void challenge5() {
     string plain_english_key = "ICE";
     string plain_hex = *ASCIIEnglishToHex(plain_english_input);
     string plain_hex_key = *ASCIIEnglishToHex(plain_english_key);
-    string cipher_hex_output = *encryptRepeatingKey(plain_hex, plain_hex_key);
+    string cipher_hex_output = *encryptOrDecryptRepeatingKey(plain_hex, plain_hex_key);
     cout << cipher_hex_output << endl;
 }
 
+void testHamming() {
+    string english_input1 = "this is a test";
+    string english_input2 = "wokka wokka!!!";
+    string hex1 = *ASCIIEnglishToHex(english_input1);
+    string hex2 = *ASCIIEnglishToHex(english_input2);
+    int dist_output = *hammingDistance(hex1, hex2);
+    cout << dist_output << endl;
+}
+
+void challenge6() {
+    fstream base64_file("challenge6_cipher.txt");
+    string line;
+    string base64_input;
+    if (base64_file.is_open()) {
+        while (getline(base64_file, line)) {
+            base64_input += line;
+        }
+    }
+
+    string hex_input = *base64ToHex(base64_input);
+    string key = *breakRepeatingKey(hex_input);
+    string plain_hex = *encryptOrDecryptRepeatingKey(hex_input, key);
+    string plain_english = *hexToASCIIEnglish(plain_hex);
+    cout << plain_english << endl;
+}
+
 int main() {
-    challenge5();
+    challenge6();
     return 0;
 }

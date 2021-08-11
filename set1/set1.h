@@ -4,35 +4,25 @@
 #include <unordered_map>
 
 using namespace std;
-string* hexToBase64(string hex);
-string* xorHex(string hex1, string hex2);
+
+;
 string* breakSingleKey(string cipher_hex);
 string* bestSingleKeyCipher(vector<string>& cipher_hex_vec);
-string* encryptRepeatingKey(string plain_hex, string key);
+string* encryptOrDecryptRepeatingKey(string hex, string key);
+string* breakRepeatingKey(string cipher_hex);
+int* bestKeySize(string cipher_hex);
+
+/* HELPERS */
+string* hexToBase64(string hex);
+string* base64ToHex(string base64);
+string* xorHex(string hex1, string hex2);
 double* likelihoodScore(string english_hex);
 string* hexToASCIIEnglish(string english_hex);
 string* ASCIIEnglishToHex(string english_ascii);
+int* hammingDistance(string hex1, string hex2);
 
 
 /* CONSTANTS */
-inline unordered_map<char, int> HEX_TO_INT = {
-    {'0', 0},
-    {'1', 1},
-    {'2', 2},
-    {'3', 3},
-    {'4', 4},
-    {'5', 5},
-    {'6', 6},
-    {'7', 7},
-    {'8', 8},
-    {'9', 9},
-    {'a', 10},
-    {'b', 11},
-    {'c', 12},
-    {'d', 13},
-    {'e', 14},
-    {'f', 15}
-};
 
 inline unordered_map<int, char> INT_TO_HEX = {
     {0, '0'},
@@ -51,6 +41,25 @@ inline unordered_map<int, char> INT_TO_HEX = {
     {13, 'd'},
     {14, 'e'},
     {15, 'f'}
+};
+
+inline unordered_map<char, int> HEX_TO_INT = {
+    {'0', 0},
+    {'1', 1},
+    {'2', 2},
+    {'3', 3},
+    {'4', 4},
+    {'5', 5},
+    {'6', 6},
+    {'7', 7},
+    {'8', 8},
+    {'9', 9},
+    {'a', 10},
+    {'b', 11},
+    {'c', 12},
+    {'d', 13},
+    {'e', 14},
+    {'f', 15}
 };
 
 inline unordered_map<int, char> INT_TO_BASE64 = {
@@ -118,6 +127,73 @@ inline unordered_map<int, char> INT_TO_BASE64 = {
     {61, '9'},
     {62, '+'},
     {63, '/'}
+};
+
+inline unordered_map<char, int> BASE64_TO_INT = {
+    {'A', 0},
+    {'B', 1},
+    {'C', 2},
+    {'D', 3},
+    {'E', 4},
+    {'F', 5},
+    {'G', 6},
+    {'H', 7},
+    {'I', 8},
+    {'J', 9},
+    {'K', 10},
+    {'L', 11},
+    {'M', 12},
+    {'N', 13},
+    {'O', 14},
+    {'P', 15},
+    {'Q', 16},
+    {'R', 17},
+    {'S', 18},
+    {'T', 19},
+    {'U', 20},
+    {'V', 21},
+    {'W', 22},
+    {'X', 23},
+    {'Y', 24},
+    {'Z', 25},
+    {'a', 26},
+    {'b', 27},
+    {'c', 28},
+    {'d', 29},
+    {'e', 30},
+    {'f', 31},
+    {'g', 32},
+    {'h', 33},
+    {'i', 34},
+    {'j', 35},
+    {'k', 36},
+    {'l', 37},
+    {'m', 38},
+    {'n', 39},
+    {'o', 40},
+    {'p', 41},
+    {'q', 42},
+    {'r', 43},
+    {'s', 44},
+    {'t', 45},
+    {'u', 46},
+    {'v', 47},
+    {'w', 48},
+    {'x', 49},
+    {'y', 50},
+    {'z', 51},
+    {'0', 52},
+    {'1', 53},
+    {'2', 54},
+    {'3', 55},
+    {'4', 56},
+    {'5', 57},
+    {'6', 58},
+    {'7', 59},
+    {'8', 60},
+    {'9', 61},
+    {'+', 62},
+    {'/', 63},
 };
 
 inline unordered_map<char, double> CHAR_FREQUENCIES = {
