@@ -1,3 +1,4 @@
 .vscode/
 inputs/
 c/
+py/__pycache__

@@ -1,5 +1,5 @@
-from conversions import IntRep
-from breakers import SingleByteXOR, RepeatingKeyXOR
+import conversions as cnv
+import breakers as brk
 from Crypto.Cipher import AES
 import sys
 import os
@@ -9,28 +9,27 @@ INPUT_FILES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "inputs")
 def p1():
     # convert hex to base64"
     inp = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
-    s = IntRep(inp, 16)
-    out = s.get_string(64)
+    x = cnv.base_to_int(inp, 16)
+    out = cnv.int_to_base(x, 64)
     print(out)
 
 def p2():
     # calculate xor
     inp1 = "1c0111001f010100061a024b53535009181c"
     inp2 = "686974207468652062756c6c277320657965"
-    s1 = IntRep(inp1, 16)
-    s2 = IntRep(inp2, 16)
-    s3 = IntRep(s1.get_int() ^ s2.get_int(), 0)
-    out = s3.get_string(16)
+    x1 = cnv.base_to_int(inp1, 16)
+    x2 = cnv.base_to_int(inp2, 16)
+    x3 = x1 ^ x2
+    out = cnv.int_to_base(x3, 16)
     print(out)
 
 def p3():
     # implement single byte xor
     inp = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
-    s = IntRep(inp, 16)
-    SBX = SingleByteXOR(16, 2)
-    k = SBX.break_enc(s)
-    x = SBX.decrypt(s, k)
-    print(x.get_ascii())
+    k = brk.sb_xor_break_enc(inp)
+    x = brk.sb_xor_decrypt(inp, k)
+    out = cnv.hex_to_ascii(x)
+    print(out)
 
 def p4():
     # break single byte xor
@@ -38,36 +37,35 @@ def p4():
     with open(inp_file, "r") as f:
         inps = f.read().splitlines()
 
-    SBX = SingleByteXOR(16, 2)
     best_prob = -1
-    best_inp = IntRep()
+    best_inp = 0
     for inp in inps:
-        s = IntRep(inp, 16)
-        x = SBX.decrypt(s, SBX.break_enc(s))
-        prob = SBX.str_prob(x)
+        k = brk.sb_xor_break_enc(inp)
+        x = brk.sb_xor_decrypt(inp, k)
+        prob = brk.str_prob(x)
         if prob > best_prob:
             best_prob = prob
             best_inp = x
-    print(best_inp.get_ascii())
+    out = cnv.hex_to_ascii(best_inp)
+    print(out)
 
 def p5():
     # implement repeating key xor
-    inp = "Burning 'em, if you ain't quick and nimble I go crazy when I hear a cymbal"
-    RKX = RepeatingKeyXOR(16, 2)
-    s = IntRep(inp, ascii=True)
-    k = IntRep("ICE", ascii=True)
-    y = RKX.encrypt(s, k)
-    print(y.get_string(16))
+    inp1 = "Burning 'em, if you ain't quick and nimble I go crazy when I hear a cymbal"
+    inp2 = "ICE"
+    x = cnv.ascii_to_hex(inp1)
+    k = cnv.ascii_to_hex(inp2)
+    out = brk.rk_xor_encrypt(x, k)
+    print(out)
 
 def hd():
     # implement hamming distance
     inp1 = "this is a test"
     inp2 = "wokka wokka!!!"
-    RKX = RepeatingKeyXOR(16, 2)
-    s1 = IntRep(inp1, ascii=True)
-    s2 = IntRep(inp2, ascii=True)
-    d = RKX.hamming_dist(s1, s2)
-    print(d)
+    h1 = cnv.ascii_to_hex(inp1)
+    h2 = cnv.ascii_to_hex(inp2)
+    out = brk.hamming_dist(h1, h2)
+    print(out)
 
 def p6():
     # break repeating key xor
@@ -77,11 +75,12 @@ def p6():
         inps = f.read().splitlines()
         for inp_str in inps:
             inp += inp_str
-    y = IntRep(inp, 64)
-    RKX = RepeatingKeyXOR(16, 2)
-    k = RKX.break_enc(y)
-    x = RKX.decrypt(y, k)
-    print(x.get_ascii())
+    i = cnv.base64_to_int(inp)
+    y = cnv.int_to_base(i, 16)
+    k = brk.rk_xor_break(y)
+    x = brk.rk_xor_decrypt(y, k)
+    out = cnv.hex_to_ascii(x)
+    print(out)
 
 def p7():
     # decrypt AES-128 ECB
@@ -92,10 +91,12 @@ def p7():
         for inp_str in inps:
             inp += inp_str
     
-    y = IntRep(inp, 64)
+    i = cnv.base64_to_int(inp)
+    h = cnv.int_to_base(i, 16)
+    y = cnv.hex_to_bytes(h)
     AES_obj = AES.new("YELLOW SUBMARINE", AES.MODE_ECB) 
-    x = AES_obj.decrypt(y.get_bytes())
-    print(str(x, "ascii"))
+    x = AES_obj.decrypt(y)
+    out = str(x, "ascii")
 
 def p8():
     # detect AES-128 ECB
