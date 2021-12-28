@@ -41,13 +41,32 @@ def p4():
     out = brk.break_aes_ecb_encryption(inp)
     utils.printout(out)
     
+def pars():
+    inp1 = "foo=bar&baz=qux&zap=zazzle"
+    inp2 = "foo@bar.com"
+    out1 = utils.k_v_parser(inp1)
+    out2 = utils.generate_profile(inp2)
+    print(out1)
+    print(out2)
+
+def p5():
+    out = brk.break_aes_user_role()
+    print(out)
+
+def p6():
+    inp = base64.b64decode("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK")
+    out = brk.break_aes_ecb_random_encryption(inp)
+    utils.printout(out)
 
 def main():
     functions = {
         "1": p1,
         "2": p2,
         "3": p3,
-        "4": p4
+        "4": p4,
+        "pars": pars,
+        "5": p5,
+        "6": p6
     }
 
     if len(sys.argv) < 2:

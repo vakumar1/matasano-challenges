@@ -80,6 +80,29 @@ def pkcs7_pad(b, block_size):
     diff = block_size - (len(b) % block_size)
     return b + int_to_bytes(diff, 1) * diff
 
+#########
+# USERS #
+#########
+
+def k_v_parser(s):
+    # get profile (dict) of encoding (string)
+    profile = {}
+    pairs = s.split("&")
+    for item in pairs:
+        key, value = item.split("=")
+        profile[key] = value
+    return profile
+
+def generate_profile(email):
+    # generator user profile encoding (string) from email
+    if ("&" in email) or ("=" in email):
+        return ""
+    uid = "10"
+    role = "user"
+    profile_encoding = "email=" + email + "&uid=" + uid + "&role=" + role
+    return profile_encoding
+
+
 #################
 # OTHER HELPERS #
 #################

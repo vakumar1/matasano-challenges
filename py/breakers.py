@@ -108,16 +108,7 @@ def aes_ebc_decrypt(y, k):
     AES_obj = AES.new(k, AES.MODE_ECB)
     return AES_obj.decrypt(y)
 
-def detect_aes_ebc(y, block_size):
-    # return True if Y (cipher bytes) encrypted with EBC mode (detects repetition)
-    passed_blocks = set()
-    repeated_blocks = set()
-    for i in range(0, len(y), block_size):
-        block = bytes(y[i:i + block_size])
-        if block in passed_blocks:
-            repeated_blocks.add(block)
-        passed_blocks.add(block)
-    return len(repeated_blocks) > 0
+
 
 def aes_cbc_encrypt(x, k, iv):
     # encrypt X (bytes) with key K (plaintext string) and IV (bytes)
@@ -160,9 +151,20 @@ def aes_cbc_decrypt(y, k, iv):
         result += block
     return result
 
-#############################
-# AES: PADDED ORACLE ATTACK #
-#############################
+############################
+# AES: DETECT ECB/CBC MODE #
+############################
+
+def detect_aes_ebc(y, block_size):
+    # return True if Y (cipher bytes) encrypted with EBC mode (detects repetition)
+    passed_blocks = set()
+    repeated_blocks = set()
+    for i in range(0, len(y), block_size):
+        block = bytes(y[i:i + block_size])
+        if block in passed_blocks:
+            repeated_blocks.add(block)
+        passed_blocks.add(block)
+    return len(repeated_blocks) > 0
 
 def random_aes_encryption(x, block_size):
     # return random AES encryption (EBC or CBC mode) of X (bytes)
@@ -187,8 +189,12 @@ def break_random_aes_encryption():
     predicted_mode = detect_aes_ebc(y, block_size)
     return actual_mode, predicted_mode
 
+###########################################
+# AES: DETERMINISTIC PADDED ORACLE ATTACK #
+###########################################
+
 def get_padded_oracle_encrypt(unknown):
-    # return padded oracle function: AES ECB encrypts input || unknown with constant random key
+    # return padded oracle function: AES ECB encrypts (input || unknown) with constant random key
     block_size = 16
     key = secrets.token_bytes(block_size)
     def padded_oracle_encrypt(x):
@@ -216,8 +222,9 @@ def break_aes_ecb_encryption(unknown):
     decrypted = bytearray()
     for block in range(0, len(unknown), block_size):
         for byte in range(block_size):
-            if block * block_size + byte >= len(unknown):
+            if block + byte >= len(unknown):
                 continue
+            
             # get encryption of unknown with null padding
             null_prefix = utils.NULL_BYTE * (block_size - (byte + 1))
             cipher = oracle(null_prefix)
@@ -230,11 +237,60 @@ def break_aes_ecb_encryption(unknown):
                 last_test_byte = utils.int_to_bytes(i, 1)
                 input_test_block = input_test_prefix + last_test_byte
                 cipher_test = oracle(input_test_block)
-                cipher_test_block = cipher_test[block:block + block_size]
+                cipher_test_block = cipher_test[:block_size]
                 if cipher_block == cipher_test_block:
                     decrypted.append(utils.bytes_to_int(last_test_byte))
                     break
     return decrypted
+
+####################################
+# AES: RANDOM PADDED ORACLE ATTACK #
+####################################
+
+def get_random_padded_oracle_encrypt(unknown):
+    # return padded oracle function: AES ECB encrypts (rand_padding || input || unknown) 
+    # with constant random key
+    block_size = 16
+    key = secrets.token_bytes(block_size)
+    def padded_oracle_encrypt(x):
+        pad_count = random.randint(5, 10)
+        pad_bytes = secrets.token_bytes(pad_count)
+        padded_x = pad_bytes + x + unknown
+        return aes_ebc_encrypt(padded_x, key)
+    return padded_oracle_encrypt
+
+def break_aes_ecb_random_encryption(unknown):
+    block_size = 16
+    oracle = get_random_padded_oracle_encrypt(unknown)
+
+
+####################
+# AES: ROLE ATTACK #
+####################
+
+def encrypt_encoded_profile(email, key):
+    encoded_profile_string = utils.generate_profile(email)
+    encoded_profile_bytes = utils.ascii_to_bytes(encoded_profile_string)
+    encrypted_profile = aes_ebc_encrypt(encoded_profile_bytes, key)
+    return encrypted_profile
+
+def break_aes_user_role():
+    block_size = 16
+    key = secrets.token_bytes(block_size)
+    
+    # get cipher prefix (profile without role)
+    email13 = "x" * 13
+    cipher_prefix = encrypt_encoded_profile(email13, key)[:block_size * 2]
+
+    # get cipher stub (only profile role with padding)
+    padded_admin = utils.pkcs7_pad(utils.ascii_to_bytes("admin"), block_size)
+    email10 = "x" * 10 + utils.bytes_to_ascii(padded_admin)
+    cipher_stub = encrypt_encoded_profile(email10, key)[block_size:block_size * 2]
+
+    cipher = cipher_prefix + cipher_stub
+    encoded_profile = aes_ebc_decrypt(cipher, key)
+    return encoded_profile
+
 
 
 
