@@ -40,14 +40,6 @@ def p4():
     block_size = brk.verify_aes_ecb_block_size(inp)
     out = brk.break_aes_ecb_encryption(inp)
     utils.printout(out)
-    
-def pars():
-    inp1 = "foo=bar&baz=qux&zap=zazzle"
-    inp2 = "foo@bar.com"
-    out1 = utils.k_v_parser(inp1)
-    out2 = utils.generate_profile(inp2)
-    print(out1)
-    print(out2)
 
 def p5():
     out = brk.break_aes_user_role()
@@ -58,15 +50,31 @@ def p6():
     out = brk.break_aes_ecb_random_encryption(inp)
     utils.printout(out)
 
+def p7():
+    inp1 = utils.ascii_to_bytes("ICE ICE BABY\x04\x04\x04\x04")
+    inp2 = utils.ascii_to_bytes("ICE ICE BABY\x05\x05\x05\x05")
+    inp3 = utils.ascii_to_bytes("ICE ICE BABY\x01\x02\x03\x04")
+    out1 = utils.remove_pkcs7_pad(inp1, 16)
+    out2 = utils.remove_pkcs7_pad(inp2, 16)
+    out3 = utils.remove_pkcs7_pad(inp3, 16)
+    utils.printout(out1)
+    utils.printout(out2)
+    utils.printout(out3)
+
+def p8():
+    out = brk.break_aes_cbc_user_data()
+    utils.printout(out)
+
 def main():
     functions = {
         "1": p1,
         "2": p2,
         "3": p3,
         "4": p4,
-        "pars": pars,
         "5": p5,
-        "6": p6
+        "6": p6,
+        "7": p7,
+        "8": p8
     }
 
     if len(sys.argv) < 2:

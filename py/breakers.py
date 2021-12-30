@@ -143,7 +143,7 @@ def aes_cbc_decrypt(y, k, iv):
     for i in range(1, len(cipher_blocks)):
         last_cipher_block = cipher_blocks[i - 1]
         curr_cipher_block = cipher_blocks[i]
-        decr_curr_block = AES_obj.decrypt(curr_cipher_block)
+        decr_curr_block = AES_obj.decrypt(bytes(curr_cipher_block))
         xor_block = utils.bytes_xor(last_cipher_block, decr_curr_block)
         plain_blocks.append(xor_block)
     result = bytearray()
@@ -252,17 +252,52 @@ def get_random_padded_oracle_encrypt(unknown):
     # with constant random key
     block_size = 16
     key = secrets.token_bytes(block_size)
+    pad_count = random.randint(0, block_size - 1)
+    pad_bytes = secrets.token_bytes(pad_count)
     def padded_oracle_encrypt(x):
-        pad_count = random.randint(5, 10)
-        pad_bytes = secrets.token_bytes(pad_count)
         padded_x = pad_bytes + x + unknown
         return aes_ebc_encrypt(padded_x, key)
     return padded_oracle_encrypt
 
+def get_random_padding_size(oracle):
+    block_size = 16
+    null_block = utils.NULL_BYTE * block_size
+    null_block_cipher = oracle(null_block * 2)[block_size:block_size * 2]
+    for suffix in range(1, block_size + 1):
+        null_block_ext = null_block + utils.NULL_BYTE * suffix
+        null_block_ext_cipher = oracle(null_block_ext)[block_size:block_size * 2]
+        if null_block_ext_cipher == null_block_cipher:
+            return block_size - suffix
+    return 0
+
 def break_aes_ecb_random_encryption(unknown):
     block_size = 16
     oracle = get_random_padded_oracle_encrypt(unknown)
-
+    prepad_size = get_random_padding_size(oracle)
+    end_pad_null_block = utils.NULL_BYTE * (block_size - prepad_size)
+    decrypted = bytearray()
+    for block in range(0, len(unknown), block_size):
+        for byte in range(block_size):
+            if block + byte >= len(unknown):
+                continue
+            
+            # get encryption of unknown with null padding
+            null_prefix = utils.NULL_BYTE * (block_size - (byte + 1))
+            cipher = oracle(end_pad_null_block + null_prefix)
+            
+            # compare actual cipher block with last unknown byte to 
+            # last (block_size - 1) bytes of known padded input
+            cipher_block = cipher[block + block_size:block + block_size * 2]
+            input_test_prefix = (null_prefix + decrypted)[-(block_size - 1):]
+            for i in range(256):
+                last_test_byte = utils.int_to_bytes(i, 1)
+                input_test_block = input_test_prefix + last_test_byte
+                cipher_test = oracle(end_pad_null_block + input_test_block)
+                cipher_test_block = cipher_test[block_size:block_size * 2]
+                if cipher_block == cipher_test_block:
+                    decrypted.append(utils.bytes_to_int(last_test_byte))
+                    break
+    return decrypted
 
 ####################
 # AES: ROLE ATTACK #
@@ -291,8 +326,38 @@ def break_aes_user_role():
     encoded_profile = aes_ebc_decrypt(cipher, key)
     return encoded_profile
 
+#################################
+# AES: CBC BIT-FLIP ROLE ATTACK #
+#################################
 
+def encrypt_user_data(data, key, iv):
+    encoded_data_string = utils.generate_user_data(data)
+    encoded_data_bytes = utils.ascii_to_bytes(encoded_data_string)
+    encrypted_data = aes_cbc_encrypt(encoded_data_bytes, key, iv)
+    return encrypted_data
 
+def user_has_admin_permissions(encr_data, key, iv):
+    decrypted_data_bytes = aes_cbc_decrypt(encr_data, key, iv)
+    data_string = utils.bytes_to_ascii(decrypted_data_bytes)
+    permission = ";admin=true;" in data_string
+    return decrypted_data_bytes, permission
+
+def break_aes_cbc_user_data():
+    block_size = 16
+    key = secrets.token_bytes(block_size)
+    iv = secrets.token_bytes(block_size)
+
+    valid_inp_data = "XXXXXSadminEtrue"
+    encr_inp_data = encrypt_user_data(valid_inp_data, key, iv)
+    for i in range(256):
+        for j in range(256):
+            encr_inp_data[21] = i
+            encr_inp_data[27] = j
+            data, permission = user_has_admin_permissions(encr_inp_data, key, iv)
+            if permission:
+                return data
+    return None
+    
 
 
     

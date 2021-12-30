@@ -39,10 +39,7 @@ CHAR_FREQS = {
 
 def bytes_to_ascii(b):
     # convert bytes B to ASCII (if not possible -> empty string "")
-    try:
-        return b.decode("ASCII")
-    except UnicodeDecodeError:
-        return ""
+    return b.decode("ASCII", "replace")
 
 def ascii_to_bytes(s):
     # convert ASCII S to bytes
@@ -80,6 +77,19 @@ def pkcs7_pad(b, block_size):
     diff = block_size - (len(b) % block_size)
     return b + int_to_bytes(diff, 1) * diff
 
+def remove_pkcs7_pad(b, block_size):
+    pad_count = b[-1]
+    if pad_count > block_size:
+        return bytearray()
+
+    pad_bytes = b[-pad_count:]
+    for pad_byte in pad_bytes:
+        if pad_byte != pad_count:
+            return bytearray()
+    return b[:-pad_count]
+
+
+
 #########
 # USERS #
 #########
@@ -101,6 +111,11 @@ def generate_profile(email):
     role = "user"
     profile_encoding = "email=" + email + "&uid=" + uid + "&role=" + role
     return profile_encoding
+
+def generate_user_data(data):
+    stripped = data.translate({ord(c): None for c in ";="})
+    return "comment1=cooking%20MCs;userdata=" + stripped + \
+        ";comment2=%20like%20a%20pound%20of%20bacon"
 
 
 #################
