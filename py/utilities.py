@@ -80,12 +80,12 @@ def pkcs7_pad(b, block_size):
 def remove_pkcs7_pad(b, block_size):
     pad_count = b[-1]
     if pad_count > block_size:
-        return bytearray()
+        return None
 
     pad_bytes = b[-pad_count:]
     for pad_byte in pad_bytes:
         if pad_byte != pad_count:
-            return bytearray()
+            return None
     return b[:-pad_count]
 
 

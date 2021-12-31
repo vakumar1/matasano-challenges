@@ -358,6 +358,28 @@ def break_aes_cbc_user_data():
                 return data
     return None
     
+########################################
+# AES: CBC PADDED RANDOM ORACLE ATTACK #
+########################################
+
+def get_random_cbc_oracle_and_pad_verifier(unknowns):
+    block_size = 16
+    key = secrets.token_bytes(block_size)
+    iv = secrets.token_bytes(block_size)
+    
+    def random_oracle_encrypt():
+        plain = random.choice(unknowns)
+        return aes_cbc_encrypt(plain, key, iv), iv
+    
+    def verify_pkcs7_padding(cipher, user_iv):
+        padded = aes_cbc_decrypt(cipher, key, user_iv)
+        unpadded = utils.remove_pkcs7_pad(padded, block_size)
+        return unpadded is not None
+    return random_oracle_encrypt, verify_pkcs7_padding
+
+def break_random_cbc_oracle(unknowns):
+    oracle, verifier = get_random_cbc_oracle_and_pad_verifier(unknowns)
+
 
 
     
