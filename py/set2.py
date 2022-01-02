@@ -54,12 +54,18 @@ def p7():
     inp1 = utils.ascii_to_bytes("ICE ICE BABY\x04\x04\x04\x04")
     inp2 = utils.ascii_to_bytes("ICE ICE BABY\x05\x05\x05\x05")
     inp3 = utils.ascii_to_bytes("ICE ICE BABY\x01\x02\x03\x04")
+    
     out1 = utils.remove_pkcs7_pad(inp1, 16)
-    out2 = utils.remove_pkcs7_pad(inp2, 16)
-    out3 = utils.remove_pkcs7_pad(inp3, 16)
     utils.printout(out1)
-    utils.printout(out2)
-    utils.printout(out3)
+    try:
+        out2 = utils.remove_pkcs7_pad(inp2, 16)
+    except ValueError as e:
+        print(e)
+    
+    try:
+        out3 = utils.remove_pkcs7_pad(inp3, 16)
+    except ValueError as e:
+        print(e)
 
 def p8():
     out = brk.break_aes_cbc_user_data()

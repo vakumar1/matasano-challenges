@@ -17,11 +17,10 @@ def p1():
     "MDAwMDA5aXRoIG15IHJhZy10b3AgZG93biBzbyBteSBoYWlyIGNhbiBibG93"]
 
     inps = [base64.b64decode(inp) for inp in inps]
-    for inp in inps:
-        print(len(inp))
-    # outs = brk.break_random_cbc_oracle(inps)
-    # for out in outs:
-    #     utils.printout(out)
+    outs = brk.break_random_cbc_oracle(inps)
+    outs.sort()
+    for out in outs:
+        utils.printout(out)
 
 
 def main():

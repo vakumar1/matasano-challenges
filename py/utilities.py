@@ -80,15 +80,13 @@ def pkcs7_pad(b, block_size):
 def remove_pkcs7_pad(b, block_size):
     pad_count = b[-1]
     if pad_count > block_size:
-        return None
+        raise ValueError("Invalid PKCS7 padding")
 
     pad_bytes = b[-pad_count:]
     for pad_byte in pad_bytes:
         if pad_byte != pad_count:
-            return None
+            raise ValueError("Invalid PKCS7 padding")
     return b[:-pad_count]
-
-
 
 #########
 # USERS #
@@ -124,6 +122,10 @@ def generate_user_data(data):
 
 def printout(out, base=0):
     # print OUT as string in BASE (default to 0 -> ASCII)
+    if out is None:
+        print(bytearray())
+        return
+    
     if base == 0:
         encoded = out
     elif base == 16:
@@ -134,6 +136,12 @@ def printout(out, base=0):
 
 def bytes_xor(b1, b2):
     # XOR bytearrays B1 and B2
+    padding = NULL_BYTE * abs(len(b1) - len(b2))
+    if len(b1) < len(b2):
+        b1 = padding + b1
+    else:
+        b2 = padding + b2
+
     result = bytearray()
     for x1, x2 in zip(b1, b2):
         result.append(x1 ^ x2)

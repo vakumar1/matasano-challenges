@@ -108,8 +108,6 @@ def aes_ebc_decrypt(y, k):
     AES_obj = AES.new(k, AES.MODE_ECB)
     return AES_obj.decrypt(y)
 
-
-
 def aes_cbc_encrypt(x, k, iv):
     # encrypt X (bytes) with key K (plaintext string) and IV (bytes)
     if len(k) != len(iv):
@@ -363,6 +361,7 @@ def break_aes_cbc_user_data():
 ########################################
 
 def get_random_cbc_oracle_and_pad_verifier(unknowns):
+    # return encryption oracle and padding verifier functions
     block_size = 16
     key = secrets.token_bytes(block_size)
     iv = secrets.token_bytes(block_size)
@@ -373,12 +372,52 @@ def get_random_cbc_oracle_and_pad_verifier(unknowns):
     
     def verify_pkcs7_padding(cipher, user_iv):
         padded = aes_cbc_decrypt(cipher, key, user_iv)
-        unpadded = utils.remove_pkcs7_pad(padded, block_size)
-        return unpadded is not None
+        try:
+            _ = utils.remove_pkcs7_pad(padded, block_size)
+            return True
+        except ValueError:
+            return False
     return random_oracle_encrypt, verify_pkcs7_padding
 
+def decrypt_cipher_with_padding_attack(cipher, iv, verifier):
+    # return decryption of CIPHER using padding verifier attack
+    block_size = 16
+    cipher_blocks = [iv] + [cipher[i:i + block_size] for i in range(0, len(cipher), block_size)]
+    decrypted = bytearray()
+    for block in range(1, len(cipher_blocks)):
+        decrypted_block = bytearray(block_size)
+        pre_block_mask = bytearray(block_size * 2)
+        sub_cipher = bytearray()
+        for sub_block in range(block + 1):
+            sub_cipher += cipher_blocks[sub_block]
+        for byte in range(block_size - 1, -1, -1):
+            valid_pad_byte_value = block_size - byte
+            for post_byte in range(block_size - 1, byte, -1):
+                pre_block_mask[post_byte] = decrypted_block[post_byte] ^ valid_pad_byte_value
+            start = 0
+            if block == len(cipher_blocks) - 1 and byte == block_size - 1:
+                start = 1
+            for mask_byte in range(start, 256):
+                pre_block_mask[byte] = mask_byte
+                masked_cipher = utils.bytes_xor(sub_cipher, pre_block_mask)
+                if verifier(masked_cipher[block_size:], masked_cipher[:block_size]):
+                    decrypted_block[byte] = valid_pad_byte_value ^ mask_byte
+                    break
+        decrypted += decrypted_block
+    return decrypted
+             
 def break_random_cbc_oracle(unknowns):
+    # break CBC encryption for random UNKNOWNS with padding verifier attack
     oracle, verifier = get_random_cbc_oracle_and_pad_verifier(unknowns)
+    decrypted = []
+    while len(decrypted) < 10:
+        cipher, iv = oracle()
+        plain = decrypt_cipher_with_padding_attack(cipher, iv, verifier)
+        if plain not in decrypted:
+            decrypted.append(plain)
+    return decrypted
+
+
 
 
 
