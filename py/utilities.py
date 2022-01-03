@@ -55,6 +55,12 @@ def int_to_bytes(i, length=0):
         length = math.ceil(math.log(i, 16))
     return int.to_bytes(i, length, "big")
 
+def int_to_bytes_little_end(i, length=0):
+    # convert int I to bytes with LENGTH
+    if length == 0:
+        length = math.ceil(math.log(i, 16))
+    return int.to_bytes(i, length, "little")
+
 #################
 # PROCESS BYTES #
 #################

@@ -57,6 +57,7 @@ def p7():
     
     out1 = utils.remove_pkcs7_pad(inp1, 16)
     utils.printout(out1)
+    
     try:
         out2 = utils.remove_pkcs7_pad(inp2, 16)
     except ValueError as e:

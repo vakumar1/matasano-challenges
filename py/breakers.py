@@ -131,6 +131,7 @@ def aes_cbc_encrypt(x, k, iv):
 
 def aes_cbc_decrypt(y, k, iv):
     # decrypt Y (bytes) with key K (plaintext string) and IV (bytes)
+    # WARNING: returns PADDED plaintext (PKCS7 padding needs to be removed manually)
     if len(k) != len(iv):
         return utils.int_to_bytes(0)
     block_size = len(k)
@@ -144,10 +145,10 @@ def aes_cbc_decrypt(y, k, iv):
         decr_curr_block = AES_obj.decrypt(bytes(curr_cipher_block))
         xor_block = utils.bytes_xor(last_cipher_block, decr_curr_block)
         plain_blocks.append(xor_block)
-    result = bytearray()
+    padded = bytearray()
     for block in plain_blocks:
-        result += block
-    return result
+        padded += block
+    return padded
 
 ############################
 # AES: DETECT ECB/CBC MODE #
@@ -417,6 +418,28 @@ def break_random_cbc_oracle(unknowns):
             decrypted.append(plain)
     return decrypted
 
+############################################
+# AES CTR MODE: BASE ENCRYPTION/DECRYPTION #
+############################################
+
+def aes_little_endian_ctr_encr_decr(inp, key, nonce):
+    nonce_size = 8
+    block_size = 16
+    inp_blocks = [inp[i:min(i + block_size, len(inp))] 
+        for i in range(0, len(inp), block_size)]
+    AES_obj = AES.new(key, AES.MODE_ECB)
+    
+    out_blocks = []
+    for ctr, inp_block in enumerate(inp_blocks):
+        nonce_block = nonce + utils.int_to_bytes_little_end(ctr, nonce_size)
+        keystream_block = AES_obj.encrypt(bytes(nonce_block))[:len(inp_block)]
+        out_block = utils.bytes_xor(inp_block, keystream_block)
+        out_blocks.append(out_block)
+    
+    out = bytearray()
+    for block in out_blocks:
+        out += block
+    return out
 
 
 

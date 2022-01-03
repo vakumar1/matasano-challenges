@@ -22,10 +22,18 @@ def p1():
     for out in outs:
         utils.printout(out)
 
+def p2():
+    inp = base64.b64decode("L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==")
+    key = "YELLOW SUBMARINE"
+    nonce = bytearray(8)
+    out = brk.aes_little_endian_ctr_encr_decr(inp, key, nonce)
+    utils.printout(out)
+
 
 def main():
     functions = {
-        "1": p1
+        "1": p1,
+        "2": p2
     }
 
     if len(sys.argv) < 2:
