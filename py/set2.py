@@ -1,5 +1,5 @@
-import utilities as utils
-import breakers as brk
+import library.utilities as utils
+import library.aes as aes
 import base64
 import sys
 import os
@@ -21,33 +21,33 @@ def p2():
         for inp_str in inps:
             inp += inp_str
     inp = base64.b64decode(inp)
-    key = "YELLOW SUBMARINE"
+    key = utils.ascii_to_bytes("YELLOW SUBMARINE")
     iv = utils.NULL_BYTE * len(key)
-    out = brk.aes_cbc_decrypt(inp, key, iv)
+    out = aes.aes_cbc_decrypt(inp, key, iv)
     utils.printout(out)
 
 def p3():
     reps = 10000
     correct = 0
     for _ in range(reps):
-        actual, predicted = brk.break_random_aes_encryption()
+        actual, predicted = aes.break_random_aes_encryption()
         if actual == predicted:
             correct += 1
     print("Correct: ", correct, " out of ", reps)
 
 def p4():
     inp = base64.b64decode("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK")
-    block_size = brk.verify_aes_ecb_block_size(inp)
-    out = brk.break_aes_ecb_encryption(inp)
+    block_size = aes.verify_aes_ecb_block_size(inp)
+    out = aes.break_aes_ecb_encryption(inp)
     utils.printout(out)
 
 def p5():
-    out = brk.break_aes_user_role()
+    out = aes.break_aes_user_role()
     print(out)
 
 def p6():
     inp = base64.b64decode("Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK")
-    out = brk.break_aes_ecb_random_encryption(inp)
+    out = aes.break_aes_ecb_random_encryption(inp)
     utils.printout(out)
 
 def p7():
@@ -69,7 +69,7 @@ def p7():
         print(e)
 
 def p8():
-    out = brk.break_aes_cbc_user_data()
+    out = aes.break_aes_cbc_user_data()
     utils.printout(out)
 
 def main():

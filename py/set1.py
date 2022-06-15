@@ -1,5 +1,6 @@
-import utilities as utils
-import breakers as brk
+import library.utilities as utils
+import library.xor as xor
+import library.aes as aes
 import base64
 import sys
 import os
@@ -21,8 +22,8 @@ def p2():
 def p3():
     # implement single byte xor
     inp = bytes.fromhex("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
-    k = brk.sb_xor_break_enc(inp)
-    x = brk.sb_xor_decrypt(inp, k)
+    k = xor.sb_xor_break_enc(inp)
+    x = xor.sb_xor_decrypt(inp, k)
     utils.printout(x)
 
 def p4():
@@ -35,8 +36,8 @@ def p4():
     best_prob = -1
     best_inp = 0
     for inp in inps:
-        k = brk.sb_xor_break_enc(inp)
-        x = brk.sb_xor_decrypt(inp, k)
+        k = xor.sb_xor_break_enc(inp)
+        x = xor.sb_xor_decrypt(inp, k)
         prob = utils.str_prob(x)
         if prob > best_prob:
             best_prob = prob
@@ -47,7 +48,7 @@ def p5():
     # implement repeating key xor
     inp1 = utils.ascii_to_bytes("Burning 'em, if you ain't quick and nimble I go crazy when I hear a cymbal")
     inp2 = utils.ascii_to_bytes("ICE")
-    out = brk.rk_xor_encrypt(inp1, inp2)
+    out = xor.rk_xor_encrypt(inp1, inp2)
     utils.printout(out, 16)
 
 def hd():
@@ -66,8 +67,8 @@ def p6():
         for inp_str in inps:
             inp += inp_str
     inp = base64.b64decode(inp)
-    k = brk.rk_xor_break(inp)
-    out = brk.rk_xor_decrypt(inp, k)
+    k = xor.rk_xor_break(inp)
+    out = xor.rk_xor_decrypt(inp, k)
     utils.printout(out)
 
 def p7():
@@ -79,8 +80,8 @@ def p7():
         for inp_str in inps:
             inp += inp_str
     inp = base64.b64decode(inp)
-    key = "YELLOW SUBMARINE"
-    out = brk.aes_ebc_decrypt(inp, key)
+    key = utils.ascii_to_bytes("YELLOW SUBMARINE")
+    out = aes.aes_ebc_decrypt(inp, key)
     utils.printout(out)
 
 def p8():
@@ -93,7 +94,7 @@ def p8():
     block_size = 16
     repeated_block_ciphers = []
     for index, inp in enumerate(inps):
-        if brk.detect_aes_ebc(inp, block_size):
+        if aes.detect_aes_ebc(inp, block_size):
             repeated_block_ciphers.append(index)
     print("Ciphers with repeating blocks:", repeated_block_ciphers)
 
