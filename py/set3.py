@@ -63,6 +63,15 @@ def p7():
     identical_out = all([MTwister.extract_number() == MTwisterClone.extract_number() for _ in range(prng.MT.n)])
     print(identical_out)
 
+def p8a():
+    cipher = prng.MTCipher(42)
+    inp = utils.ascii_to_bytes('A' * 14)
+    enc = prng.pad_and_encrypt(cipher, inp)
+    seed = prng.recover_seed_from_padded_encryption(inp, enc)
+    print(seed)
+
+
+
 def main():
     functions = {
         "1": p1,
@@ -70,7 +79,8 @@ def main():
         "4": p4,
         "5": p5,
         "6": p6,
-        "7": p7
+        "7": p7,
+        "8": p8a
     }
 
     if len(sys.argv) < 2:

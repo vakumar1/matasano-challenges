@@ -2,3 +2,4 @@
 inputs/
 c/
 py/__pycache__/
+py/library/__pycache__/

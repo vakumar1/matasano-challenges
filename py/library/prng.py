@@ -1,5 +1,10 @@
 import time
 import random
+import library.utilities as utils 
+
+###########################################
+# Mersenne Twister PRNG and Stream Cipher #
+###########################################
 
 class MT:
     # MT19937 constants
@@ -26,7 +31,7 @@ class MT:
     upper_mask = (~lower_mask) % (1 << 32)
 
     # initialize MTwister's internal state (624 int array)
-    def __init__(self, seed, state=None):
+    def __init__(self, seed):
         self.state = [0 for _ in range(MT.n)]
         self.index = MT.n
         self.state[0] = seed
@@ -58,6 +63,25 @@ class MT:
 
             self.state[i] = self.state[(i + MT.m) % MT.n] ^ xA
         self.index = 0
+
+class MTCipher:
+    def __init__(self, seed):
+        self.PRNG = MT(seed)
+        self.ciphers = bytearray()
+
+    def regenerate(self):
+        next_num = self.PRNG.extract_number()
+        next_num_bytes =  utils.int_to_bytes(next_num, 4)
+        self.ciphers += next_num_bytes        
+
+    def get_key(self, n_bytes):
+        while len(self.ciphers) <= n_bytes:
+            self.regenerate()
+
+        key = self.ciphers[:n_bytes]
+        self.cipher = self.ciphers[n_bytes:]
+        return key
+
 
 ######################
 # CRACK MT19937 SEED #
@@ -134,7 +158,7 @@ def untemper_state_value(state_value):
         y0 += next_bit
     return int(y0, 2)
 
-def clone_mt(MTwister):
+def clone_mt(MTwister: MT):
     new_state = []
     for i in range(MT.n):
         tempered = MTwister.extract_number()
@@ -145,3 +169,35 @@ def clone_mt(MTwister):
     MTwisterClone.set_state(new_state)
     return MTwisterClone
 
+#########################
+# MT19937 STREAM CIPHER #
+#########################
+
+def pad_and_encrypt(cipher: MTCipher, x):
+    pad_size = random.randint(0, 10)
+    pad = bytearray()
+    for _ in range(pad_size):
+        pad +=  utils.int_to_bytes(random.randint(0, 255), 2)
+    padded_x = pad + x
+    k = cipher.get_key(len(padded_x))
+    y =  utils.bytes_xor(padded_x, k)
+    return y
+
+def recover_seed_from_padded_encryption(x, y):
+    pad_size = len(y) - len(x)
+    start_byte = pad_size
+    if start_byte % 4 != 0:
+        start_byte = (start_byte // 4 * 4) + 4
+    index = start_byte // 4
+    state =  utils.bytes_to_int(y[start_byte:start_byte + 4])
+    while index > 0:
+        curr_state = zero_pad(bin(state // MT.f - (index - 1))[2:])
+        next_state = curr_state[:MT.w - 2]
+        for i in range(MT.w - 2, MT.w):
+            curr_state_bit = curr_state[i]
+            shifted_bit = curr_state[i - (MT.w - 2)]
+            next_bit = "0" if curr_state_bit == shifted_bit else "1"
+            next_state += next_bit
+        state = int(next_state, 2)
+        index -= 1
+    return state
