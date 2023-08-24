@@ -1,5 +1,5 @@
 .vscode/
 inputs/
 c/
-py/__pycache__/
-py/library/__pycache__/
+**/__pycache__/
+**/venv/

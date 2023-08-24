@@ -1,6 +1,7 @@
 import library.utilities as utils
 import library.aes as aes
 import library.prng as prng
+import random
 import secrets
 import base64
 import sys
@@ -64,11 +65,12 @@ def p7():
     print(identical_out)
 
 def p8a():
-    cipher = prng.MTCipher(42)
+    seed = random.randint(0, 1 << 16)
+    cipher = prng.MTCipher(seed)
     inp = utils.ascii_to_bytes('A' * 14)
     enc = prng.pad_and_encrypt(cipher, inp)
-    seed = prng.recover_seed_from_padded_encryption(inp, enc)
-    print(seed)
+    recovered_seed = prng.recover_seed_from_padded_encryption(inp, enc)
+    print(seed == recovered_seed)
 
 
 

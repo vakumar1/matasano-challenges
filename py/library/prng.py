@@ -177,7 +177,7 @@ def pad_and_encrypt(cipher: MTCipher, x):
     pad_size = random.randint(0, 10)
     pad = bytearray()
     for _ in range(pad_size):
-        pad +=  utils.int_to_bytes(random.randint(0, 255), 2)
+        pad +=  utils.int_to_bytes(random.randint(0, 255), 1)
     padded_x = pad + x
     k = cipher.get_key(len(padded_x))
     y =  utils.bytes_xor(padded_x, k)
@@ -186,18 +186,15 @@ def pad_and_encrypt(cipher: MTCipher, x):
 def recover_seed_from_padded_encryption(x, y):
     pad_size = len(y) - len(x)
     start_byte = pad_size
+    x_start = 0
     if start_byte % 4 != 0:
-        start_byte = (start_byte // 4 * 4) + 4
+        new_start_byte = (start_byte // 4 * 4) + 4
+        x_start = new_start_byte - start_byte
+        start_byte = new_start_byte
     index = start_byte // 4
-    state =  utils.bytes_to_int(y[start_byte:start_byte + 4])
-    while index > 0:
-        curr_state = zero_pad(bin(state // MT.f - (index - 1))[2:])
-        next_state = curr_state[:MT.w - 2]
-        for i in range(MT.w - 2, MT.w):
-            curr_state_bit = curr_state[i]
-            shifted_bit = curr_state[i - (MT.w - 2)]
-            next_bit = "0" if curr_state_bit == shifted_bit else "1"
-            next_state += next_bit
-        state = int(next_state, 2)
-        index -= 1
-    return state
+    state =  utils.bytes_xor(x[x_start:x_start + 4], y[start_byte:start_byte + 4])
+    for seed in range(1 << 16):
+        cipher = MTCipher(seed)
+        last_state = cipher.get_key((index + 1) * 4)[-4:]
+        if last_state == state:
+            return seed
