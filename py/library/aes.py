@@ -371,6 +371,36 @@ def break_aes_ctr_encr(inps):
                 for i in range(0, len(decr_rk_inp), shortest_len)]
     return decr_inps
 
+######################
+# AES CTR MODE: SEEK #
+######################
+
+def aes_little_endian_ctr_random_encr(inp, nonce):
+    block_size = 16
+    nonce_size = 8
+    key = secrets.token_bytes(block_size)
+    encr = aes_little_endian_ctr_encr_decr(inp, key, nonce)
+
+    def edit(ciphertext, offset, newtext):
+        AES_obj = AES.new(key, AES.MODE_ECB)
+        start_index = (offset // block_size)
+        end_index = ((offset + len(newtext)) // block_size) + 1
+        keystream = bytearray()
+        for ctr in range(start_index, end_index):
+            nonce_block = nonce + utils.int_to_bytes_little_end(ctr, nonce_size)
+            keystream_block = AES_obj.encrypt(bytes(nonce_block))
+            keystream += keystream_block
+        key_start = offset % 16
+        key_end = key_start + len(newtext)
+        new_ciphertext = ciphertext[:]
+        new_ciphertext[offset:offset + len(newtext)] = utils.bytes_xor(newtext, keystream[key_start:key_end])
+        return new_ciphertext
     
+    return encr, edit
+
+def break_aes_ctr_random_encr(encr, edit):
+    return edit(encr, 0, encr)
+
+
 
 
