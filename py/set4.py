@@ -19,10 +19,14 @@ def p1():
     encr, edit = aes.aes_little_endian_ctr_random_encr(inp, nonce)
     utils.printout(aes.break_aes_ctr_random_encr(encr, edit))
 
+def p2():
+    out = aes.break_aes_ctr_user_data()
+    utils.printout(out)
 
 def main():
     functions = {
         "1": p1,
+        "2": p2,
     }
 
     if len(sys.argv) < 2:

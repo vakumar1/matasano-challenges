@@ -402,5 +402,36 @@ def break_aes_ctr_random_encr(encr, edit):
     return edit(encr, 0, encr)
 
 
+#####################################
+# AES CTR MODE: BITFLIP ROLE ATTACK #
+#####################################
 
+def encrypt_user_data_ctr(data, key, iv):
+    encoded_data_string = utils.generate_user_data(data)
+    encoded_data_bytes = utils.ascii_to_bytes(encoded_data_string)
+    encrypted_data = aes_little_endian_ctr_encr_decr(encoded_data_bytes, key, iv)
+    return encrypted_data
+
+def user_has_admin_permissions_ctr(encr_data, key, iv):
+    decrypted_data_bytes = aes_little_endian_ctr_encr_decr(encr_data, key, iv)
+    data_string = utils.bytes_to_ascii(decrypted_data_bytes)
+    permission = ";admin=true;" in data_string
+    return decrypted_data_bytes, permission
+
+def break_aes_ctr_user_data():
+    block_size = 16
+    nonce_size = 8
+    key = secrets.token_bytes(block_size)
+    nonce = secrets.token_bytes(nonce_size)
+
+    valid_inp_data = "XXXXXSadminEtrue"
+    encr_inp_data = encrypt_user_data_ctr(valid_inp_data, key, nonce)
+    for i in range(256):
+        for j in range(256):
+            encr_inp_data[37] = i
+            encr_inp_data[43] = j
+            data, permission = user_has_admin_permissions_ctr(encr_inp_data, key, nonce)
+            if permission:
+                return data
+    return None
 
