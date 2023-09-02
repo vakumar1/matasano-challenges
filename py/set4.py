@@ -23,10 +23,15 @@ def p2():
     out = aes.break_aes_ctr_user_data()
     utils.printout(out)
 
+def p3():
+    got_key = aes.break_aes_cbc_keyiv_user_data()
+    print(got_key)
+
 def main():
     functions = {
         "1": p1,
         "2": p2,
+        "3": p3
     }
 
     if len(sys.argv) < 2:
@@ -34,6 +39,8 @@ def main():
     else:
         execute = sys.argv[1:]
     for func in execute:
+        if func not in functions:
+            continue
         print(f"================================= {func} =================================")
         functions[func]()
 

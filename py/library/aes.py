@@ -331,6 +331,28 @@ def break_random_cbc_oracle(unknowns):
             decrypted.append(plain)
     return decrypted
 
+###############################
+# AES CBC MODE: IV=KEY ATTACK #
+###############################
+
+def break_aes_cbc_keyiv_user_data():
+    block_size = 16
+    key = secrets.token_bytes(block_size)
+    iv = key
+
+    valid_inp_data = "A" * (3 * block_size)
+    encr_inp_data = encrypt_user_data(valid_inp_data, key, iv)
+    encr_blocks = [encr_inp_data[:block_size], 
+                encr_inp_data[block_size:2 * block_size], 
+                encr_inp_data[2 * block_size:3 * block_size]]
+    encr_inp_data_mod = encr_blocks[0] + utils.NULL_BYTE * block_size + encr_blocks[0]
+    decrypted_data_bytes, permission = user_has_admin_permissions(encr_inp_data_mod, key, iv)
+    decr_blocks = [decrypted_data_bytes[:block_size],
+                decrypted_data_bytes[block_size:2 * block_size],
+                decrypted_data_bytes[2 * block_size:3 * block_size]]
+    key_prime = utils.bytes_xor(decr_blocks[0], decr_blocks[2])
+    return key == key_prime
+
 ############################################
 # AES CTR MODE: BASE ENCRYPTION/DECRYPTION #
 ############################################
