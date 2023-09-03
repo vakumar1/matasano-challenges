@@ -2,6 +2,7 @@ import base64
 import math
 
 NULL_BYTE = bytes.fromhex("00")
+ONE_BYTE = bytes.fromhex("FF")
 
 CHAR_FREQS = {
     'a': 0.08167,
@@ -52,7 +53,10 @@ def bytes_to_int(b):
 def int_to_bytes(i, length=0):
     # convert int I to bytes with LENGTH
     if length == 0:
-        length = math.ceil(math.log(i, 16))
+        if i == 0:
+            length = 1
+        else:
+            length = math.ceil(math.log(i, 16))
     return int.to_bytes(i, length, "big")
 
 def int_to_bytes_little_end(i, length=0):
@@ -134,6 +138,10 @@ def printout(out, base=0):
     
     if base == 0:
         encoded = out
+    elif base == 2:
+        encoded = bin(bytes_to_int(out))
+        print(encoded)
+        return
     elif base == 16:
         encoded = base64.b16encode(out)
     elif base == 64:
@@ -152,6 +160,51 @@ def bytes_xor(b1, b2):
     for x1, x2 in zip(b1, b2):
         result.append(x1 ^ x2)
     return result
+
+def bytes_and(b1, b2):
+    padding = NULL_BYTE * abs(len(b1) - len(b2))
+    if len(b1) < len(b2):
+        b1 = padding + b1
+    else:
+        b2 = padding + b2
+
+    result = bytearray()
+    for x1, x2 in zip(b1, b2):
+        result.append(x1 & x2)
+    return result
+
+def bytes_or(b1, b2):
+    padding = NULL_BYTE * abs(len(b1) - len(b2))
+    if len(b1) < len(b2):
+        b1 = padding + b1
+    else:
+        b2 = padding + b2
+
+    result = bytearray()
+    for x1, x2 in zip(b1, b2):
+        result.append(x1 | x2)
+    return result
+
+def bytes_not(b):
+    result = bytearray()
+    for byte in b:
+        result += ~byte
+    return result
+
+def bytes_leftrotate(b, count):
+    inp_bit_len = len(b) * 8
+    inp_byte_len = len(b)
+    upper_byte_cnt = math.ceil(count / 8)
+    right_bitshift_cnt = upper_byte_cnt * 8 - count
+
+    count = count % inp_bit_len
+    upper_bytes = b[:upper_byte_cnt]
+    new_b = b + upper_bytes
+    new_b = bytes_to_int(new_b) >> right_bitshift_cnt
+    new_b = int_to_bytes(new_b, inp_byte_len + upper_byte_cnt)
+    new_b = new_b[-inp_byte_len:]
+    return new_b
+
 
 def str_prob(x):
     # return the probability of PT X

@@ -1,6 +1,7 @@
 import library.utilities as utils
 import library.aes as aes
 import library.prng as prng
+import library.mac as mac
 import random
 import secrets
 import base64
@@ -27,11 +28,24 @@ def p3():
     got_key = aes.break_aes_cbc_keyiv_user_data()
     print(got_key)
 
+def p4():
+    inp = utils.ascii_to_bytes("hello world")
+    expected = bytes.fromhex("2aae6c35c94fcfb415dbe95f408b9ce91ee846ed")
+    hash = mac.sha1(inp)
+    print("SHA1 sanity check: ", expected == hash)
+
+    key = secrets.token_bytes(random.randint(1, 32))
+    mac_hash = mac.sha1_mac_gen(key, inp)
+    print("Verify correct SHA1 MAC: ", mac.sha1_mac_verify(key, inp, mac_hash))
+    tampered = bytearray([mac_hash[0] + 1]) + mac_hash[1:]
+    print("Verify invalid SHA1 MAC: ", mac.sha1_mac_verify(key, inp, tampered))
+
 def main():
     functions = {
         "1": p1,
         "2": p2,
-        "3": p3
+        "3": p3,
+        "4": p4
     }
 
     if len(sys.argv) < 2:
