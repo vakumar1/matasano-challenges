@@ -4,15 +4,8 @@ import library.utilities as utils
 # SHA1 MAC #
 ############
 
-def sha1(inp):
-
-    h0 = 0x67452301
-    h1 = 0xEFCDAB89
-    h2 = 0x98BADCFE
-    h3 = 0x10325476
-    h4 = 0xC3D2E1F0
-
-    ml = len(inp) * 8
+# return padding: pad to 0 % 512 bits and add input length
+def sha1_padding(inp, ml):
     if ml % 512 == 448:
         padding_len = 448
     elif ml % 512 < 448:
@@ -22,9 +15,30 @@ def sha1(inp):
     assert padding_len % 8 == 0 and padding_len > 0
     padding = bytearray(utils.NULL_BYTE * (padding_len // 8))
     padding[0] = 0x80
-    inp += padding
-    inp += utils.int_to_bytes(ml, 8)
+    padding += utils.int_to_bytes(ml, 8)
+    return padding
 
+def sha1(inp, registers=[], inp_length=0):
+
+    # set initial register values and add padding
+    if len(registers) == 0:
+        h0 = 0x67452301
+        h1 = 0xEFCDAB89
+        h2 = 0x98BADCFE
+        h3 = 0x10325476
+        h4 = 0xC3D2E1F0
+        ml = len(inp) * 8
+    else:
+        h0 = utils.bytes_to_int(registers[0])
+        h1 = utils.bytes_to_int(registers[1])
+        h2 = utils.bytes_to_int(registers[2])
+        h3 = utils.bytes_to_int(registers[3])
+        h4 = utils.bytes_to_int(registers[4])
+        ml = inp_length
+    inp += sha1_padding(inp, ml)
+    assert len(inp) % 64 == 0
+
+    # update registers for each 512-bit chunk in input
     chunk_size = 64
     chunks = [inp[i:i + chunk_size] for i in range(0, len(inp), chunk_size)]
     for chunk in chunks:
@@ -75,3 +89,25 @@ def sha1_mac_gen(key, inp):
 
 def sha1_mac_verify(key, inp, mac):
     return sha1(key + inp) == mac
+
+####################################
+# SHA1 MAC LENGTH EXTENSION ATTACK #
+####################################
+
+def get_sha1_mac_verifier(key):
+    def verifier(inp, mac):
+        return sha1_mac_verify(key, inp, mac)
+    return verifier
+
+def extend_sha1_mac(verifier, mac_hash, inp, extension):
+    for key_len in range(1, 32):
+        orig_padding = sha1_padding(inp, (key_len + len(inp)) * 8)
+        new_inp = inp + orig_padding + extension
+
+        registers = [mac_hash[i:i + 4] for i in range(0, len(mac_hash), 4)]
+        inp_length = (key_len + len(inp) + len(orig_padding) + len(extension)) * 8
+        new_mac_hash = sha1(extension, registers=registers, inp_length=inp_length)
+        if verifier(new_inp, new_mac_hash):
+            return new_inp, new_mac_hash
+    return utils.NULL_BYTE, utils.NULL_BYTE
+

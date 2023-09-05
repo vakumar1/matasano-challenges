@@ -29,10 +29,15 @@ def p3():
     print(got_key)
 
 def p4():
-    inp = utils.ascii_to_bytes("hello world")
-    expected = bytes.fromhex("2aae6c35c94fcfb415dbe95f408b9ce91ee846ed")
-    hash = mac.sha1(inp)
-    print("SHA1 sanity check: ", expected == hash)
+    inps = {
+        "hello world": "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed",
+        "A" * 100: "7a4a9ae537ebbbb826b1060e704490ad0f365ead"
+    }
+    for inp, expected in inps.items():
+        inp = utils.ascii_to_bytes(inp)
+        expected = bytes.fromhex(expected)
+        hash = mac.sha1(inp)
+        print("SHA1 sanity check: ", expected == hash)
 
     key = secrets.token_bytes(random.randint(1, 32))
     mac_hash = mac.sha1_mac_gen(key, inp)
@@ -40,12 +45,24 @@ def p4():
     tampered = bytearray([mac_hash[0] + 1]) + mac_hash[1:]
     print("Verify invalid SHA1 MAC: ", mac.sha1_mac_verify(key, inp, tampered))
 
+def p5():
+    inp = utils.ascii_to_bytes("comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon")
+    key = secrets.token_bytes(1) # random.randint(1, 32))
+    mac_hash = mac.sha1_mac_gen(key, inp)
+
+    mac_verifier = mac.get_sha1_mac_verifier(key)
+    extension = utils.ascii_to_bytes(";admin=true")
+    new_inp, new_mac_hash = mac.extend_sha1_mac(mac_verifier, mac_hash, inp, extension)
+    print("Verify correct extended SHA1 MAC: ", mac.sha1_mac_verify(key, new_inp, new_mac_hash))
+    utils.printout(new_inp)
+
 def main():
     functions = {
         "1": p1,
         "2": p2,
         "3": p3,
-        "4": p4
+        "4": p4,
+        "5": p5
     }
 
     if len(sys.argv) < 2:
