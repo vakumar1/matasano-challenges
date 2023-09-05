@@ -47,7 +47,7 @@ def p4():
 
 def p5():
     inp = utils.ascii_to_bytes("comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon")
-    key = secrets.token_bytes(1) # random.randint(1, 32))
+    key = secrets.token_bytes(random.randint(1, 32))
     mac_hash = mac.sha1_mac_gen(key, inp)
 
     mac_verifier = mac.get_sha1_mac_verifier(key)
