@@ -50,6 +50,10 @@ def bytes_to_int(b):
     # convert bytes B to int
     return int.from_bytes(b, "big")
 
+def bytes_to_int_little_end(b):
+    # convert bytes B to int
+    return int.from_bytes(b, "little")
+
 def int_to_bytes(i, length=0):
     # convert int I to bytes with LENGTH
     if length == 0:

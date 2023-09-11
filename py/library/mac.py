@@ -100,7 +100,7 @@ def get_sha1_mac_verifier(key):
     return verifier
 
 def extend_sha1_mac(verifier, mac_hash, inp, extension):
-    for key_len in range(1, 32):
+    for key_len in range(1, 33):
         orig_padding = sha1_padding(inp, (key_len + len(inp)) * 8)
         new_inp = inp + orig_padding + extension
 
@@ -136,10 +136,10 @@ def md4(inp, registers=[], inp_length=0):
         D = 0x10325476
         ml = len(inp) * 8
     else:
-        A = utils.bytes_to_int(registers[0])
-        B = utils.bytes_to_int(registers[1])
-        C = utils.bytes_to_int(registers[2])
-        D = utils.bytes_to_int(registers[3])
+        A = utils.bytes_to_int_little_end(registers[0])
+        B = utils.bytes_to_int_little_end(registers[1])
+        C = utils.bytes_to_int_little_end(registers[2])
+        D = utils.bytes_to_int_little_end(registers[3])
         ml = inp_length
     inp += md4_padding(inp, ml)
     assert len(inp) % 64 == 0
@@ -246,3 +246,30 @@ def md4(inp, registers=[], inp_length=0):
     return utils.int_to_bytes_little_end(A, 4) + utils.int_to_bytes_little_end(B, 4) + \
                 utils.int_to_bytes_little_end(C, 4) + utils.int_to_bytes_little_end(D, 4)
 
+
+def md4_mac_gen(key, inp):
+    return md4(key + inp)
+
+def md4_mac_verify(key, inp, mac):
+    return md4(key + inp) == mac
+
+###################################
+# MD4 MAC LENGTH EXTENSION ATTACK #
+###################################
+
+def get_md4_mac_verifier(key):
+    def verifier(inp, mac):
+        return md4_mac_verify(key, inp, mac)
+    return verifier
+
+def extend_md4_mac(verifier, mac_hash, inp, extension):
+    for key_len in range(1, 33):
+        orig_padding = md4_padding(inp, (key_len + len(inp)) * 8)
+        new_inp = inp + orig_padding + extension
+
+        registers = [mac_hash[i:i + 4] for i in range(0, len(mac_hash), 4)]
+        inp_length = (key_len + len(inp) + len(orig_padding) + len(extension)) * 8
+        new_mac_hash = md4(extension, registers=registers, inp_length=inp_length)
+        if verifier(new_inp, new_mac_hash):
+            return new_inp, new_mac_hash
+    return utils.NULL_BYTE, utils.NULL_BYTE

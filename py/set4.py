@@ -67,6 +67,16 @@ def p6():
         hash = mac.md4(inp)
         print("MD4 sanity check: ", expected == hash)
 
+    inp = utils.ascii_to_bytes("comment1=cooking%20MCs;userdata=foo;comment2=%20like%20a%20pound%20of%20bacon")
+    key = secrets.token_bytes(random.randint(1, 32))
+    mac_hash = mac.md4_mac_gen(key, inp)
+
+    mac_verifier = mac.get_md4_mac_verifier(key)
+    extension = utils.ascii_to_bytes(";admin=true")
+    new_inp, new_mac_hash = mac.extend_md4_mac(mac_verifier, mac_hash, inp, extension)
+    print("Verify correct extended MD4 MAC: ", mac.md4_mac_verify(key, new_inp, new_mac_hash))
+    utils.printout(new_inp)
+
 def main():
     functions = {
         "1": p1,
