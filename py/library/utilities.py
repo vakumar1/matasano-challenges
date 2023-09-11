@@ -193,17 +193,23 @@ def bytes_not(b):
 
 def bytes_leftrotate(b, count):
     inp_bit_len = len(b) * 8
-    inp_byte_len = len(b)
-    upper_byte_cnt = math.ceil(count / 8)
-    right_bitshift_cnt = upper_byte_cnt * 8 - count
-
     count = count % inp_bit_len
-    upper_bytes = b[:upper_byte_cnt]
-    new_b = b + upper_bytes
-    new_b = bytes_to_int(new_b) >> right_bitshift_cnt
-    new_b = int_to_bytes(new_b, inp_byte_len + upper_byte_cnt)
-    new_b = new_b[-inp_byte_len:]
-    return new_b
+    int_b = bytes_to_int(b)
+    rot =  (((int_b << count)) | (int_b >> (inp_bit_len - count))) % (1 << 32)
+    return int_to_bytes(rot, len(b))
+
+
+    inp_byte_len = len(b)
+    # upper_byte_cnt = math.ceil(count / 8)
+    # right_bitshift_cnt = upper_byte_cnt * 8 - count
+
+    # count = count % inp_bit_len
+    # upper_bytes = b[:upper_byte_cnt]
+    # new_b = b + upper_bytes
+    # new_b = bytes_to_int(new_b) >> right_bitshift_cnt
+    # new_b = int_to_bytes(new_b, inp_byte_len + upper_byte_cnt)
+    # new_b = new_b[-inp_byte_len:]
+    # return new_b
 
 
 def str_prob(x):

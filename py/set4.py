@@ -56,13 +56,25 @@ def p5():
     print("Verify correct extended SHA1 MAC: ", mac.sha1_mac_verify(key, new_inp, new_mac_hash))
     utils.printout(new_inp)
 
+def p6():
+    inps = {
+        "hello world": "aa010fbc1d14c795d86ef98c95479d17",
+        "A" * 100: "2dd1488c24914cc34cea36a3a9241ca9"
+    }
+    for inp, expected in inps.items():
+        inp = utils.ascii_to_bytes(inp)
+        expected = bytes.fromhex(expected)
+        hash = mac.md4(inp)
+        print("MD4 sanity check: ", expected == hash)
+
 def main():
     functions = {
         "1": p1,
         "2": p2,
         "3": p3,
         "4": p4,
-        "5": p5
+        "5": p5,
+        "6": p6
     }
 
     if len(sys.argv) < 2:

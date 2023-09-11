@@ -111,3 +111,138 @@ def extend_sha1_mac(verifier, mac_hash, inp, extension):
             return new_inp, new_mac_hash
     return utils.NULL_BYTE, utils.NULL_BYTE
 
+###########
+# MD4 MAC #
+###########
+
+def md4_padding(inp, ml):
+    if ml % 512 == 448:
+        padding_len = 448
+    elif ml % 512 < 448:
+        padding_len = 448 - (ml % 512)
+    else:
+        padding_len = 448 + (512 - (ml % 512))
+    assert padding_len % 8 == 0 and padding_len > 0
+    padding = bytearray(utils.NULL_BYTE * (padding_len // 8))
+    padding[0] = 0x80
+    padding += utils.int_to_bytes_little_end(ml, 8)
+    return padding
+
+def md4(inp, registers=[], inp_length=0):
+    if len(registers) == 0:
+        A = 0x67452301
+        B = 0xefcdab89
+        C = 0x98badcfe
+        D = 0x10325476
+        ml = len(inp) * 8
+    else:
+        A = utils.bytes_to_int(registers[0])
+        B = utils.bytes_to_int(registers[1])
+        C = utils.bytes_to_int(registers[2])
+        D = utils.bytes_to_int(registers[3])
+        ml = inp_length
+    inp += md4_padding(inp, ml)
+    assert len(inp) % 64 == 0
+
+    # update registers for each 512-bit chunk in input
+
+    def F(x, y, z):
+        return (x & y) | (~x & z)
+    def G(x, y, z):
+        return (x & y) | (x & z) | (y & z)
+    def H(x, y, z):
+        return x ^ y ^ z
+    
+    chunk_size = 64
+    chunks = [inp[i:i + chunk_size] for i in range(0, len(inp), chunk_size)]
+    for chunk in chunks:
+        AA = A
+        BB = B
+        CC = C
+        DD = D
+
+        word_size = 4
+        words = [utils.bytes_to_int(chunk[i:i + word_size][::-1]) for i in range(0, chunk_size, word_size)]
+
+        # round 1
+        def round1(X1, X2, X3, X4, k, s):
+            summ = utils.int_to_bytes((X1 + F(X2, X3, X4) + words[k]) % (1 << 32), 4)
+            return utils.bytes_to_int(utils.bytes_leftrotate(summ, s))
+        A = round1(A, B, C, D, 0, 3)
+        D = round1(D, A, B, C, 1, 7)
+        C = round1(C, D, A, B, 2, 11)
+        B = round1(B, C, D, A, 3, 19)
+
+        A = round1(A, B, C, D, 4, 3)
+        D = round1(D, A, B, C, 5, 7)
+        C = round1(C, D, A, B, 6, 11)
+        B = round1(B, C, D, A, 7, 19)
+
+        A = round1(A, B, C, D, 8, 3)
+        D = round1(D, A, B, C, 9, 7)
+        C = round1(C, D, A, B, 10, 11)
+        B = round1(B, C, D, A, 11, 19)
+
+        A = round1(A, B, C, D, 12, 3)
+        D = round1(D, A, B, C, 13, 7)
+        C = round1(C, D, A, B, 14, 11)
+        B = round1(B, C, D, A, 15, 19)
+
+        # round 2
+        def round2(X1, X2, X3, X4, k, s):
+            summ = utils.int_to_bytes((X1 + G(X2, X3, X4) + words[k] + 0x5A827999) % (1 << 32), 4)
+            return utils.bytes_to_int(utils.bytes_leftrotate(summ, s))
+        
+        A = round2(A, B, C, D, 0, 3)
+        D = round2(D, A, B, C, 4, 5)
+        C = round2(C, D, A, B, 8, 9)
+        B = round2(B, C, D, A, 12, 13)
+
+        A = round2(A, B, C, D, 1, 3)
+        D = round2(D, A, B, C, 5, 5)
+        C = round2(C, D, A, B, 9, 9)
+        B = round2(B, C, D, A, 13, 13)
+
+        A = round2(A, B, C, D, 2, 3)
+        D = round2(D, A, B, C, 6, 5)
+        C = round2(C, D, A, B, 10, 9)
+        B = round2(B, C, D, A, 14, 13)
+
+        A = round2(A, B, C, D, 3, 3)
+        D = round2(D, A, B, C, 7, 5)
+        C = round2(C, D, A, B, 11, 9)
+        B = round2(B, C, D, A, 15, 13)
+
+        # round3
+        def round3(X1, X2, X3, X4, k, s):
+            summ = utils.int_to_bytes((X1 + H(X2, X3, X4) + words[k] + 0x6ED9EBA1) % (1 << 32), 4)
+            return utils.bytes_to_int(utils.bytes_leftrotate(summ, s))
+        
+        A = round3(A, B, C, D, 0, 3)
+        D = round3(D, A, B, C, 8, 9)
+        C = round3(C, D, A, B, 4, 11)
+        B = round3(B, C, D, A, 12, 15)
+
+        A = round3(A, B, C, D, 2, 3)
+        D = round3(D, A, B, C, 10, 9)
+        C = round3(C, D, A, B, 6, 11)
+        B = round3(B, C, D, A, 14, 15)
+
+        A = round3(A, B, C, D, 1, 3)
+        D = round3(D, A, B, C, 9, 9)
+        C = round3(C, D, A, B, 5, 11)
+        B = round3(B, C, D, A, 13, 15)
+
+        A = round3(A, B, C, D, 3, 3)
+        D = round3(D, A, B, C, 11, 9)
+        C = round3(C, D, A, B, 7, 11)
+        B = round3(B, C, D, A, 15, 15)
+
+        A = (A + AA) % (1 << 32)
+        B = (B + BB) % (1 << 32)
+        C = (C + CC) % (1 << 32)
+        D = (D + DD) % (1 << 32)
+
+    return utils.int_to_bytes_little_end(A, 4) + utils.int_to_bytes_little_end(B, 4) + \
+                utils.int_to_bytes_little_end(C, 4) + utils.int_to_bytes_little_end(D, 4)
+
