@@ -2,6 +2,11 @@ import library.utilities as utils
 import library.aes as aes
 import library.prng as prng
 import library.mac as mac
+
+from http.server import HTTPServer
+import time
+import threading
+from functools import partial
 import random
 import secrets
 import base64
@@ -77,6 +82,21 @@ def p6():
     print("Verify correct extended MD4 MAC: ", mac.md4_mac_verify(key, new_inp, new_mac_hash))
     utils.printout(new_inp)
 
+def run_target_server(key):
+    port = 8080
+    handler = partial(mac.HMACHandler, 0.075, key)
+    server = HTTPServer(("", port), handler)
+    server.serve_forever()
+
+def p7():
+    key = secrets.token_bytes(random.randint(1, 32))
+    file = "Filecontents..."
+    t = threading.Thread(target=run_target_server, args=(key,))
+    t.start()
+    time.sleep(1)
+    print(mac.break_slow_sha1_hmac("http://localhost:8080/verify", file))
+    print(mac.sha1_hmac_gen(key, utils.ascii_to_bytes(file)))
+
 def main():
     functions = {
         "1": p1,
@@ -84,7 +104,8 @@ def main():
         "3": p3,
         "4": p4,
         "5": p5,
-        "6": p6
+        "6": p6,
+        "7": p7
     }
 
     if len(sys.argv) < 2:

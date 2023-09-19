@@ -1,5 +1,11 @@
 import library.utilities as utils
 
+from http.server import BaseHTTPRequestHandler
+import urllib
+import requests
+import time
+import binascii
+
 ############
 # SHA1 MAC #
 ############
@@ -273,3 +279,74 @@ def extend_md4_mac(verifier, mac_hash, inp, extension):
         if verifier(new_inp, new_mac_hash):
             return new_inp, new_mac_hash
     return utils.NULL_BYTE, utils.NULL_BYTE
+
+####################
+# HMAC TIMING LEAK #
+####################
+
+class HMACHandler(BaseHTTPRequestHandler):
+    def __init__(self, sleep_time, key, *args, **kwargs):
+        self.key = key
+        self.sleep_time = sleep_time
+        super().__init__(*args, **kwargs)
+
+    def do_GET(self):
+        parsed_url = urllib.parse.urlparse(self.path)
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        file_param = utils.ascii_to_bytes(query_params.get('file', [''])[0])
+        hmac_param = bytes.fromhex(query_params.get('hmac', [''])[0])
+        if parsed_url.path == '/verify' and file_param and hmac_param:
+            verified = self.slow_sha1_hmac_verify(file_param, hmac_param)
+            result = "Correct.\n" if verified else "Incorrect.\n"
+            self.send_response(200 if verified else 500)
+        else:
+            result = "Not found.\n"
+            self.send_response(404)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(result.encode('utf-8'))
+
+    def slow_sha1_hmac_verify(self, inp, mac):
+        hmac = sha1_hmac_gen(self.key, inp)
+        for i in range(len(mac)):
+            if hmac[i] != mac[i]:
+                return False
+            time.sleep(self.sleep_time)
+        return True
+
+def sha1_hmac_gen(key, inp):
+    opad = bytearray([0x5C] * len(key))
+    ipad = bytearray([0x36] * len(key))
+    okey = utils.bytes_xor(key, opad)
+    ikey = utils.bytes_xor(key, ipad)
+    return sha1(okey + sha1(ikey + inp))
+
+def break_slow_sha1_hmac(server_url, file):
+    mac_len = 20
+    curr_mac = bytearray(mac_len)
+    for i in range(mac_len):
+        slowest_byte, slowest_time = 0, 0
+        copy_mac = curr_mac[:]
+        for b in range(0, 256):
+            copy_mac[i] = b
+            start = time.time()
+            try:
+                requests.get(server_url, params={
+                    "file": file,
+                    "hmac": binascii.hexlify(copy_mac).decode('utf-8')
+                })
+            except requests.exceptions.HTTPError:
+                pass
+            end = time.time()
+            diff = end - start
+            if diff > slowest_time:
+                slowest_byte, slowest_time = b, diff
+        curr_mac[i] = slowest_byte
+    try:
+        res = requests.get(server_url, params={
+            "file": file,
+            "hmac": binascii.hexlify(curr_mac).decode('utf-8')
+        })
+    except requests.exceptions.HTTPError:
+        pass
+    return res.status_code == 200
