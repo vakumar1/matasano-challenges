@@ -305,6 +305,9 @@ class HMACHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(result.encode('utf-8'))
+    
+    def log_message(self, format, *args):
+        pass
 
     def slow_sha1_hmac_verify(self, inp, mac):
         hmac = sha1_hmac_gen(self.key, inp)
@@ -342,6 +345,54 @@ def break_slow_sha1_hmac(server_url, file):
             if diff > slowest_time:
                 slowest_byte, slowest_time = b, diff
         curr_mac[i] = slowest_byte
+    try:
+        res = requests.get(server_url, params={
+            "file": file,
+            "hmac": binascii.hexlify(curr_mac).decode('utf-8')
+        })
+    except requests.exceptions.HTTPError:
+        pass
+    return res.status_code == 200
+
+def break_faster_sha1_hmac(server_url, file):
+    # dummy requests to warm up server
+    for _ in range(5):
+        try:
+            requests.get(server_url, params={
+                "file": file,
+                "hmac": "DEADBEEF"
+            })
+        except requests.exceptions.HTTPError:
+            pass
+    
+    mac_len = 20
+    curr_mac = bytearray(mac_len)
+    for i in range(mac_len):
+        copy_mac = curr_mac[:]
+        times = {b:0 for b in range(0, 256)}
+
+        # LLN, baby
+        for _ in range(10):
+            for b in range(0, 256):
+                copy_mac[i] = b
+                for _ in range(50):
+                    start = time.time()
+                    try:
+                        requests.get(server_url, params={
+                            "file": file,
+                            "hmac": binascii.hexlify(copy_mac).decode('utf-8')
+                        })
+                    except requests.exceptions.HTTPError:
+                        pass
+                    end = time.time()
+                    times[b] += (end - start)
+        
+        slowest_byte, slowest_time = 0, 0
+        for b in range(0, 256):
+            if times[b] > slowest_time:
+                slowest_byte, slowest_time = b, times[b]
+        curr_mac[i] = slowest_byte
+        
     try:
         res = requests.get(server_url, params={
             "file": file,

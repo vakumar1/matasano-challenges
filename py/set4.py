@@ -82,19 +82,29 @@ def p6():
     print("Verify correct extended MD4 MAC: ", mac.md4_mac_verify(key, new_inp, new_mac_hash))
     utils.printout(new_inp)
 
-def run_target_server(key):
+def run_target_server(key, sleep_time):
     port = 8080
-    handler = partial(mac.HMACHandler, 0.075, key)
+    handler = partial(mac.HMACHandler, sleep_time, key)
     server = HTTPServer(("", port), handler)
     server.serve_forever()
 
 def p7():
     key = secrets.token_bytes(random.randint(1, 32))
     file = "Filecontents..."
-    t = threading.Thread(target=run_target_server, args=(key,))
+    t = threading.Thread(target=run_target_server, args=(key, 0.075))
     t.start()
     time.sleep(1)
     print(mac.break_slow_sha1_hmac("http://localhost:8080/verify", file))
+    print(mac.sha1_hmac_gen(key, utils.ascii_to_bytes(file)))
+
+def p8():
+    key = secrets.token_bytes(random.randint(1, 32))
+    file = "Filecontents..."
+    print(mac.sha1_hmac_gen(key, utils.ascii_to_bytes(file)))
+    t = threading.Thread(target=run_target_server, args=(key, 0.01))
+    t.start()
+    time.sleep(1)
+    print(mac.break_faster_sha1_hmac("http://localhost:8080/verify", file))
     print(mac.sha1_hmac_gen(key, utils.ascii_to_bytes(file)))
 
 def main():
@@ -105,7 +115,8 @@ def main():
         "4": p4,
         "5": p5,
         "6": p6,
-        "7": p7
+        "7": p7,
+        "8": p8
     }
 
     if len(sys.argv) < 2:
