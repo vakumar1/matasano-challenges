@@ -44,11 +44,74 @@ def p2():
     print("MITM DH msg exchange: verified: ", sender.data == msg and correct)
     print("MITM DH msg exchange: attack succeeded: ", mitm_data1 == msg)
 
+def p3():
+    msg = utils.ascii_to_bytes("How long, how long will I slide?")
+
+    # attack 1: g = 1 --> A = 1, s = 1
+    # attack 2: g = p --> A = 0, s = 0
+    for attack_args in [(lambda p: 1, 1, 1), (lambda p: p, 0, 0)]:
+        s = pk.DHSenderNegotiated()
+        r = pk.DHReceiverNegotiated()
+        m = pk.DHMITM_g(*attack_args)
+        s.handle_init_msg(r.init_msg2(m.inject_init_msg2_sender(s.init_msg2(r.init_msg(*m.inject_init_msg_sender(*s.init_msg()))))))
+        
+        sender_data = s.data_msg(msg)
+        mitm_data1 = m.decrypt_intercepted_msg(sender_data)
+        receiver_data = r.data_msg(sender_data)
+        mitm_data2 = m.decrypt_intercepted_msg(receiver_data)
+        correct = s.verify_data_msg(receiver_data)
+
+        print(f"MITM DH msg exchange attack: g = {attack_args[1]}")
+        print("MITM DH msg exchange: verified: ", s.data == msg and correct)
+        print("MITM DH msg exchange: attack succeeded: ", mitm_data1 == msg)
+
+    # attack 3: g = p - 1 --> A = 1, s = p - 1 (or 1)
+    while True:
+        s = pk.DHSenderNegotiated()
+        r = pk.DHReceiverNegotiated()
+        m = pk.DHMITM_g(lambda p: p - 1, 1, 1)
+        s.handle_init_msg(r.init_msg2(m.inject_init_msg2_sender(s.init_msg2(r.init_msg(*m.inject_init_msg_sender(*s.init_msg()))))))
+        
+        # we always guess A = 1 (so the recever has s = 1) --> retry when the sender has s = p - 1
+        try:
+            sender_data = s.data_msg(msg)
+            receiver_data = r.data_msg(sender_data)
+            correct = s.verify_data_msg(receiver_data)
+        except ValueError:
+            correct = False
+        if not correct:
+            continue
+
+        # try s = 1
+        try:
+            mitm_data1 = m.decrypt_intercepted_msg(sender_data)
+            mitm_data2 = m.decrypt_intercepted_msg(receiver_data)
+        except ValueError:
+            mitm_data1 = None
+            mitm_data2 = None
+
+        # try s = p - 1
+        m.s = m.p - 1
+        try:
+            alt_mitm_data1 = m.decrypt_intercepted_msg(sender_data)
+            alt_mitm_data2 = m.decrypt_intercepted_msg(receiver_data)
+        except ValueError:
+            alt_mitm_data1 = None
+            alt_mitm_data2 = None
+
+
+        print(f"MITM DH msg exchange attack: g = {m.p - 1}")
+        print("MITM DH msg exchange: verified: ", s.data == msg and correct)
+        print("MITM DH msg exchange: attack succeeded: ", mitm_data1 == msg or alt_mitm_data1 == msg)
+        return
+
+
 
 def main():
     functions = {
         "1": p1,
-        "2": p2
+        "2": p2,
+        "3": p3
     }
 
     if len(sys.argv) < 2:

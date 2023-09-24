@@ -114,3 +114,52 @@ class DHMITM:
         data = utils.remove_pkcs7_pad(aes.aes_cbc_decrypt(encr_data, encr_key, sender_iv), aes.BLOCK_SIZE)
         return data
     
+class DHSenderNegotiated(DHSender):
+    def __init__(self):
+        self.p, self.g = DEF_P, DEF_G
+
+    def init_msg(self):
+        return (self.p, self.g)
+    
+    def init_msg2(self, ack):
+        if ack:
+            self.a, self.A = diffie_hellman_gen_keys(self.g, self.p)
+            return self.A
+        return None
+    
+
+class DHReceiverNegotiated(DHReceiver):
+    def init_msg(self, p, g):
+        # default to always approve parameters
+        self.p, self.g = p, g
+        return True
+    
+    def init_msg2(self, A):
+        self.A = A
+        self.b, self.B = diffie_hellman_gen_keys(self.g, self.p)
+        return self.B
+    
+class DHMITM_g:
+    def __init__(self, g_fn, injected_A, s):
+        # parameterize attack by g_fn (computes injected g as a function of p), value to inject as A, resulting secret
+        self.g_fn = g_fn
+        self.A = injected_A
+        self.s = s
+
+    def inject_init_msg_sender(self, p, g):
+        self.p = p
+        return p, self.g_fn(p)
+    
+    def inject_init_msg2_sender(self, A):
+        return self.A
+    
+    def decrypt_intercepted_msg(self, received):
+        s = self.s
+        s_bytes = utils.int_to_bytes(s)
+        encr_key, _ = sha1_keymac_hash_fn(s_bytes)
+
+        encr_data = received[:-aes.BLOCK_SIZE]
+        sender_iv = received[-aes.BLOCK_SIZE:]
+        data = utils.remove_pkcs7_pad(aes.aes_cbc_decrypt(encr_data, encr_key, sender_iv), aes.BLOCK_SIZE)
+        return data
+    
