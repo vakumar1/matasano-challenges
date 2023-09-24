@@ -1,24 +1,54 @@
 import library.public_key as pk
+import library.utilities as utils
 
 import sys
 
 def p1():
     p, g = 37, 5
-    A, B, a, b = pk.diffie_hellman_gen_keys(g, p)
-    keys1 = pk.diffie_hellman_gen_secret(g, p, a, B)
-    keys2 = pk.diffie_hellman_gen_secret(g, p, b, A)
+    a, A = pk.diffie_hellman_gen_keys(g, p)
+    b, B = pk.diffie_hellman_gen_keys(g, p)
+    keys1 = pk.diffie_hellman_gen_secret(g, p, a, B, pk.sha256_keymac_hash_fn)
+    keys2 = pk.diffie_hellman_gen_secret(g, p, b, A, pk.sha256_keymac_hash_fn)
     print("Simple DH key exchange: ", keys1 == keys2)
 
-    p = 0xffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a637ed6b0bff5cb6f406b7edee386bfb5a899fa5ae9f24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed529077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff
-    g = 2
-    A, B, a, b = pk.diffie_hellman_gen_keys(g, p)
-    keys1 = pk.diffie_hellman_gen_secret(g, p, a, B)
-    keys2 = pk.diffie_hellman_gen_secret(g, p, b, A)
+    p = pk.DEF_P
+    g = pk.DEF_G
+    a, A = pk.diffie_hellman_gen_keys(g, p)
+    b, B = pk.diffie_hellman_gen_keys(g, p)
+    keys1 = pk.diffie_hellman_gen_secret(g, p, a, B, pk.sha256_keymac_hash_fn)
+    keys2 = pk.diffie_hellman_gen_secret(g, p, b, A, pk.sha256_keymac_hash_fn)
     print("Larger DH key exchange: ", keys1 == keys2)
+
+def p2():
+    # verify protocol is correct
+    sender = pk.DHSender()
+    receiver = pk.DHReceiver()
+    sender.handle_init_msg(receiver.init_msg(*sender.init_msg()))
+
+    msg = utils.ascii_to_bytes("How long, how long will I slide?")
+    correct = sender.verify_data_msg(receiver.data_msg(sender.data_msg(msg)))
+    print("DH msg exchange: ", sender.data == msg and correct)
+
+    # test MITM attack
+    sender = pk.DHSender()
+    receiver = pk.DHReceiver()
+    mitm = pk.DHMITM()
+    sender.handle_init_msg(mitm.inject_init_msg_receiver(receiver.init_msg(*mitm.inject_init_msg_sender(*sender.init_msg()))))
+
+    sender_data = sender.data_msg(msg)
+    mitm_data1 = mitm.decrypt_intercepted_msg(sender_data)
+    receiver_data = receiver.data_msg(sender_data)
+    mitm_data2 = mitm.decrypt_intercepted_msg(receiver_data)
+    correct = sender.verify_data_msg(receiver_data)
+
+    print("MITM DH msg exchange: verified: ", sender.data == msg and correct)
+    print("MITM DH msg exchange: attack succeeded: ", mitm_data1 == msg)
+
 
 def main():
     functions = {
-        "1": p1
+        "1": p1,
+        "2": p2
     }
 
     if len(sys.argv) < 2:

@@ -14,7 +14,7 @@ def p1():
 
 def p2():
     # AES CBC mode decrypt
-    inp_file = os.path.join(INPUT_FILES, "challenge10_cipher.txt")
+    inp_file = os.path.join(INPUT_FILES, "10.txt")
     inp = ""
     with open(inp_file, "r") as f:
         inps = f.read().splitlines()

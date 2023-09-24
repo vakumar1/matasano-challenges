@@ -9,11 +9,14 @@ import random
 # AES: BASIC ENCRYPTION/DECRYPTION #
 ####################################
 
+BLOCK_SIZE = 16
+NONCE_SIZE = 8
+
 def aes_ebc_encrypt(x, k):
     # encrypt X (bytes) with key K (bytes/string) in AES EBC mode
+    assert len(k) == BLOCK_SIZE
     AES_obj = AES.new(k, AES.MODE_ECB)
-    block_size = len(k)
-    padded_x = utils.pkcs7_pad(x, block_size)
+    padded_x = utils.pkcs7_pad(x, BLOCK_SIZE)
     return AES_obj.encrypt(padded_x)
 
 def aes_ebc_decrypt(y, k):
@@ -23,16 +26,14 @@ def aes_ebc_decrypt(y, k):
 
 def aes_cbc_encrypt(x, k, iv):
     # encrypt X (bytes) with key K (plaintext string) and IV (bytes)
-    if len(k) != len(iv):
-        return utils.int_to_bytes(0)
-    block_size = len(k)
+    assert len(k) == BLOCK_SIZE and len(iv) == BLOCK_SIZE
     AES_obj = AES.new(k, AES.MODE_ECB)
-    padded_x = utils.pkcs7_pad(x, block_size)
+    padded_x = utils.pkcs7_pad(x, BLOCK_SIZE)
     
     cipher_blocks = [iv]
-    for i in range(0, len(padded_x), block_size):
+    for i in range(0, len(padded_x), BLOCK_SIZE):
         last_cipher_block = cipher_blocks[-1]
-        curr_block = padded_x[i:i + block_size]
+        curr_block = padded_x[i:i + BLOCK_SIZE]
         xor_block = utils.bytes_xor(last_cipher_block, curr_block)
         next_cipher_block = AES_obj.encrypt(bytes(xor_block))
         cipher_blocks.append(next_cipher_block)
@@ -45,12 +46,10 @@ def aes_cbc_encrypt(x, k, iv):
 def aes_cbc_decrypt(y, k, iv):
     # decrypt Y (bytes) with key K (plaintext string) and IV (bytes)
     # WARNING: returns PADDED plaintext (PKCS7 padding needs to be removed manually)
-    if len(k) != len(iv):
-        return utils.int_to_bytes(0)
-    block_size = len(k)
+    assert len(k) == BLOCK_SIZE and len(iv) == BLOCK_SIZE
     AES_obj = AES.new(k, AES.MODE_ECB)
 
-    cipher_blocks = [iv] + [y[i:i + block_size] for i in range(0, len(y), block_size)]
+    cipher_blocks = [iv] + [y[i:i + BLOCK_SIZE] for i in range(0, len(y), BLOCK_SIZE)]
     plain_blocks = []
     for i in range(1, len(cipher_blocks)):
         last_cipher_block = cipher_blocks[i - 1]
@@ -94,11 +93,10 @@ def random_aes_encryption(x, block_size):
 
 def break_random_aes_encryption():
     # (oracle) predict mode of random AES encryption
-    block_size = 16
-    x = utils.NULL_BYTE * block_size * 4
-    actual_mode_num, y = random_aes_encryption(x, block_size)
+    x = utils.NULL_BYTE * BLOCK_SIZE * 4
+    actual_mode_num, y = random_aes_encryption(x, BLOCK_SIZE)
     actual_mode = actual_mode_num == 1
-    predicted_mode = detect_aes_ebc(y, block_size)
+    predicted_mode = detect_aes_ebc(y, BLOCK_SIZE)
     return actual_mode, predicted_mode
 
 ###########################################
@@ -107,8 +105,7 @@ def break_random_aes_encryption():
 
 def get_padded_oracle_encrypt(unknown):
     # return padded oracle function: AES ECB encrypts (input || unknown) with constant random key
-    block_size = 16
-    key = secrets.token_bytes(block_size)
+    key = secrets.token_bytes(BLOCK_SIZE)
     def padded_oracle_encrypt(x):
         padded_x = x + unknown
         return aes_ebc_encrypt(padded_x, key)
@@ -129,27 +126,26 @@ def verify_aes_ecb_block_size(unknown):
 
 def break_aes_ecb_encryption(unknown):
     # use padded oracle to indirectly find UNKNOWN with byte-by-byte attack
-    block_size = 16
     oracle = get_padded_oracle_encrypt(unknown)
     decrypted = bytearray()
-    for block in range(0, len(unknown), block_size):
-        for byte in range(block_size):
+    for block in range(0, len(unknown), BLOCK_SIZE):
+        for byte in range(BLOCK_SIZE):
             if block + byte >= len(unknown):
                 continue
             
             # get encryption of unknown with null padding
-            null_prefix = utils.NULL_BYTE * (block_size - (byte + 1))
+            null_prefix = utils.NULL_BYTE * (BLOCK_SIZE - (byte + 1))
             cipher = oracle(null_prefix)
             
             # compare actual cipher block with last unknown byte to 
             # last (block_size - 1) bytes of known padded input
-            cipher_block = cipher[block:block + block_size]
-            input_test_prefix = (null_prefix + decrypted)[-(block_size - 1):]
+            cipher_block = cipher[block:block + BLOCK_SIZE]
+            input_test_prefix = (null_prefix + decrypted)[-(BLOCK_SIZE - 1):]
             for i in range(256):
                 last_test_byte = utils.int_to_bytes(i, 1)
                 input_test_block = input_test_prefix + last_test_byte
                 cipher_test = oracle(input_test_block)
-                cipher_test_block = cipher_test[:block_size]
+                cipher_test_block = cipher_test[:BLOCK_SIZE]
                 if cipher_block == cipher_test_block:
                     decrypted.append(utils.bytes_to_int(last_test_byte))
                     break
@@ -162,9 +158,8 @@ def break_aes_ecb_encryption(unknown):
 def get_random_padded_oracle_encrypt(unknown):
     # return padded oracle function: AES ECB encrypts (rand_padding || input || unknown) 
     # with constant random key
-    block_size = 16
-    key = secrets.token_bytes(block_size)
-    pad_count = random.randint(0, block_size - 1)
+    key = secrets.token_bytes(BLOCK_SIZE)
+    pad_count = random.randint(0, BLOCK_SIZE - 1)
     pad_bytes = secrets.token_bytes(pad_count)
     def padded_oracle_encrypt(x):
         padded_x = pad_bytes + x + unknown
@@ -172,40 +167,38 @@ def get_random_padded_oracle_encrypt(unknown):
     return padded_oracle_encrypt
 
 def get_random_padding_size(oracle):
-    block_size = 16
-    null_block = utils.NULL_BYTE * block_size
-    null_block_cipher = oracle(null_block * 2)[block_size:block_size * 2]
-    for suffix in range(1, block_size + 1):
+    null_block = utils.NULL_BYTE * BLOCK_SIZE
+    null_block_cipher = oracle(null_block * 2)[BLOCK_SIZE:BLOCK_SIZE * 2]
+    for suffix in range(1, BLOCK_SIZE + 1):
         null_block_ext = null_block + utils.NULL_BYTE * suffix
-        null_block_ext_cipher = oracle(null_block_ext)[block_size:block_size * 2]
+        null_block_ext_cipher = oracle(null_block_ext)[BLOCK_SIZE:BLOCK_SIZE * 2]
         if null_block_ext_cipher == null_block_cipher:
-            return block_size - suffix
+            return BLOCK_SIZE - suffix
     return 0
 
 def break_aes_ecb_random_encryption(unknown):
-    block_size = 16
     oracle = get_random_padded_oracle_encrypt(unknown)
     prepad_size = get_random_padding_size(oracle)
-    end_pad_null_block = utils.NULL_BYTE * (block_size - prepad_size)
+    end_pad_null_block = utils.NULL_BYTE * (BLOCK_SIZE - prepad_size)
     decrypted = bytearray()
-    for block in range(0, len(unknown), block_size):
-        for byte in range(block_size):
+    for block in range(0, len(unknown), BLOCK_SIZE):
+        for byte in range(BLOCK_SIZE):
             if block + byte >= len(unknown):
                 continue
             
             # get encryption of unknown with null padding
-            null_prefix = utils.NULL_BYTE * (block_size - (byte + 1))
+            null_prefix = utils.NULL_BYTE * (BLOCK_SIZE - (byte + 1))
             cipher = oracle(end_pad_null_block + null_prefix)
             
             # compare actual cipher block with last unknown byte to 
             # last (block_size - 1) bytes of known padded input
-            cipher_block = cipher[block + block_size:block + block_size * 2]
-            input_test_prefix = (null_prefix + decrypted)[-(block_size - 1):]
+            cipher_block = cipher[block + BLOCK_SIZE:block + BLOCK_SIZE * 2]
+            input_test_prefix = (null_prefix + decrypted)[-(BLOCK_SIZE - 1):]
             for i in range(256):
                 last_test_byte = utils.int_to_bytes(i, 1)
                 input_test_block = input_test_prefix + last_test_byte
                 cipher_test = oracle(end_pad_null_block + input_test_block)
-                cipher_test_block = cipher_test[block_size:block_size * 2]
+                cipher_test_block = cipher_test[BLOCK_SIZE:BLOCK_SIZE * 2]
                 if cipher_block == cipher_test_block:
                     decrypted.append(utils.bytes_to_int(last_test_byte))
                     break
@@ -222,17 +215,16 @@ def encrypt_encoded_profile(email, key):
     return encrypted_profile
 
 def break_aes_user_role():
-    block_size = 16
-    key = secrets.token_bytes(block_size)
+    key = secrets.token_bytes(BLOCK_SIZE)
     
     # get cipher prefix (profile without role)
     email13 = "x" * 13
-    cipher_prefix = encrypt_encoded_profile(email13, key)[:block_size * 2]
+    cipher_prefix = encrypt_encoded_profile(email13, key)[:BLOCK_SIZE * 2]
 
     # get cipher stub (only profile role with padding)
-    padded_admin = utils.pkcs7_pad(utils.ascii_to_bytes("admin"), block_size)
+    padded_admin = utils.pkcs7_pad(utils.ascii_to_bytes("admin"), BLOCK_SIZE)
     email10 = "x" * 10 + utils.bytes_to_ascii(padded_admin)
-    cipher_stub = encrypt_encoded_profile(email10, key)[block_size:block_size * 2]
+    cipher_stub = encrypt_encoded_profile(email10, key)[BLOCK_SIZE:BLOCK_SIZE * 2]
 
     cipher = cipher_prefix + cipher_stub
     encoded_profile = aes_ebc_decrypt(cipher, key)
@@ -255,9 +247,8 @@ def user_has_admin_permissions(encr_data, key, iv):
     return decrypted_data_bytes, permission
 
 def break_aes_cbc_user_data():
-    block_size = 16
-    key = secrets.token_bytes(block_size)
-    iv = secrets.token_bytes(block_size)
+    key = secrets.token_bytes(BLOCK_SIZE)
+    iv = secrets.token_bytes(BLOCK_SIZE)
 
     valid_inp_data = "XXXXXSadminEtrue"
     encr_inp_data = encrypt_user_data(valid_inp_data, key, iv)
@@ -276,9 +267,8 @@ def break_aes_cbc_user_data():
 
 def get_random_cbc_oracle_and_pad_verifier(unknowns):
     # return encryption oracle and padding verifier functions
-    block_size = 16
-    key = secrets.token_bytes(block_size)
-    iv = secrets.token_bytes(block_size)
+    key = secrets.token_bytes(BLOCK_SIZE)
+    iv = secrets.token_bytes(BLOCK_SIZE)
     
     def random_oracle_encrypt():
         plain = random.choice(unknowns)
@@ -287,7 +277,7 @@ def get_random_cbc_oracle_and_pad_verifier(unknowns):
     def verify_pkcs7_padding(cipher, user_iv):
         padded = aes_cbc_decrypt(cipher, key, user_iv)
         try:
-            _ = utils.remove_pkcs7_pad(padded, block_size)
+            _ = utils.remove_pkcs7_pad(padded, BLOCK_SIZE)
             return True
         except ValueError:
             return False
@@ -295,26 +285,25 @@ def get_random_cbc_oracle_and_pad_verifier(unknowns):
 
 def decrypt_cipher_with_padding_attack(cipher, iv, verifier):
     # return decryption of CIPHER using padding verifier attack
-    block_size = 16
-    cipher_blocks = [iv] + [cipher[i:i + block_size] for i in range(0, len(cipher), block_size)]
+    cipher_blocks = [iv] + [cipher[i:i + BLOCK_SIZE] for i in range(0, len(cipher), BLOCK_SIZE)]
     decrypted = bytearray()
     for block in range(1, len(cipher_blocks)):
-        decrypted_block = bytearray(block_size)
-        pre_block_mask = bytearray(block_size * 2)
+        decrypted_block = bytearray(BLOCK_SIZE)
+        pre_block_mask = bytearray(BLOCK_SIZE * 2)
         sub_cipher = bytearray()
         for sub_block in range(block + 1):
             sub_cipher += cipher_blocks[sub_block]
-        for byte in range(block_size - 1, -1, -1):
-            valid_pad_byte_value = block_size - byte
-            for post_byte in range(block_size - 1, byte, -1):
+        for byte in range(BLOCK_SIZE - 1, -1, -1):
+            valid_pad_byte_value = BLOCK_SIZE - byte
+            for post_byte in range(BLOCK_SIZE - 1, byte, -1):
                 pre_block_mask[post_byte] = decrypted_block[post_byte] ^ valid_pad_byte_value
             start = 0
-            if block == len(cipher_blocks) - 1 and byte == block_size - 1:
+            if block == len(cipher_blocks) - 1 and byte == BLOCK_SIZE - 1:
                 start = 1
             for mask_byte in range(start, 256):
                 pre_block_mask[byte] = mask_byte
                 masked_cipher = utils.bytes_xor(sub_cipher, pre_block_mask)
-                if verifier(masked_cipher[block_size:], masked_cipher[:block_size]):
+                if verifier(masked_cipher[BLOCK_SIZE:], masked_cipher[:BLOCK_SIZE]):
                     decrypted_block[byte] = valid_pad_byte_value ^ mask_byte
                     break
         decrypted += decrypted_block
@@ -336,20 +325,19 @@ def break_random_cbc_oracle(unknowns):
 ###############################
 
 def break_aes_cbc_keyiv_user_data():
-    block_size = 16
-    key = secrets.token_bytes(block_size)
+    key = secrets.token_bytes(BLOCK_SIZE)
     iv = key
 
-    valid_inp_data = "A" * (3 * block_size)
+    valid_inp_data = "A" * (3 * BLOCK_SIZE)
     encr_inp_data = encrypt_user_data(valid_inp_data, key, iv)
-    encr_blocks = [encr_inp_data[:block_size], 
-                encr_inp_data[block_size:2 * block_size], 
-                encr_inp_data[2 * block_size:3 * block_size]]
-    encr_inp_data_mod = encr_blocks[0] + utils.NULL_BYTE * block_size + encr_blocks[0]
+    encr_blocks = [encr_inp_data[:BLOCK_SIZE], 
+                encr_inp_data[BLOCK_SIZE:2 * BLOCK_SIZE], 
+                encr_inp_data[2 * BLOCK_SIZE:3 * BLOCK_SIZE]]
+    encr_inp_data_mod = encr_blocks[0] + utils.NULL_BYTE * BLOCK_SIZE + encr_blocks[0]
     decrypted_data_bytes, permission = user_has_admin_permissions(encr_inp_data_mod, key, iv)
-    decr_blocks = [decrypted_data_bytes[:block_size],
-                decrypted_data_bytes[block_size:2 * block_size],
-                decrypted_data_bytes[2 * block_size:3 * block_size]]
+    decr_blocks = [decrypted_data_bytes[:BLOCK_SIZE],
+                decrypted_data_bytes[BLOCK_SIZE:2 * BLOCK_SIZE],
+                decrypted_data_bytes[2 * BLOCK_SIZE:3 * BLOCK_SIZE]]
     key_prime = utils.bytes_xor(decr_blocks[0], decr_blocks[2])
     return key == key_prime
 
@@ -358,15 +346,13 @@ def break_aes_cbc_keyiv_user_data():
 ############################################
 
 def aes_little_endian_ctr_encr_decr(inp, key, nonce):
-    nonce_size = 8
-    block_size = 16
-    inp_blocks = [inp[i:min(i + block_size, len(inp))] 
-        for i in range(0, len(inp), block_size)]
+    inp_blocks = [inp[i:min(i + BLOCK_SIZE, len(inp))] 
+        for i in range(0, len(inp), BLOCK_SIZE)]
     AES_obj = AES.new(key, AES.MODE_ECB)
     
     out_blocks = []
     for ctr, inp_block in enumerate(inp_blocks):
-        nonce_block = nonce + utils.int_to_bytes_little_end(ctr, nonce_size)
+        nonce_block = nonce + utils.int_to_bytes_little_end(ctr, NONCE_SIZE)
         keystream_block = AES_obj.encrypt(bytes(nonce_block))[:len(inp_block)]
         out_block = utils.bytes_xor(inp_block, keystream_block)
         out_blocks.append(out_block)
@@ -398,18 +384,16 @@ def break_aes_ctr_encr(inps):
 ######################
 
 def aes_little_endian_ctr_random_encr(inp, nonce):
-    block_size = 16
-    nonce_size = 8
-    key = secrets.token_bytes(block_size)
+    key = secrets.token_bytes(BLOCK_SIZE)
     encr = aes_little_endian_ctr_encr_decr(inp, key, nonce)
 
     def edit(ciphertext, offset, newtext):
         AES_obj = AES.new(key, AES.MODE_ECB)
-        start_index = (offset // block_size)
-        end_index = ((offset + len(newtext)) // block_size) + 1
+        start_index = (offset // BLOCK_SIZE)
+        end_index = ((offset + len(newtext)) // BLOCK_SIZE) + 1
         keystream = bytearray()
         for ctr in range(start_index, end_index):
-            nonce_block = nonce + utils.int_to_bytes_little_end(ctr, nonce_size)
+            nonce_block = nonce + utils.int_to_bytes_little_end(ctr, NONCE_SIZE)
             keystream_block = AES_obj.encrypt(bytes(nonce_block))
             keystream += keystream_block
         key_start = offset % 16
@@ -421,7 +405,7 @@ def aes_little_endian_ctr_random_encr(inp, nonce):
     return encr, edit
 
 def break_aes_ctr_random_encr(encr, edit):
-    return edit(encr, 0, encr)
+    return edit(bytearray(), 0, encr)
 
 
 #####################################
@@ -441,10 +425,8 @@ def user_has_admin_permissions_ctr(encr_data, key, iv):
     return decrypted_data_bytes, permission
 
 def break_aes_ctr_user_data():
-    block_size = 16
-    nonce_size = 8
-    key = secrets.token_bytes(block_size)
-    nonce = secrets.token_bytes(nonce_size)
+    key = secrets.token_bytes(BLOCK_SIZE)
+    nonce = secrets.token_bytes(NONCE_SIZE)
 
     valid_inp_data = "XXXXXSadminEtrue"
     encr_inp_data = encrypt_user_data_ctr(valid_inp_data, key, nonce)

@@ -28,7 +28,7 @@ def p3():
 
 def p4():
     # break single byte xor
-    inp_file = os.path.join(INPUT_FILES, "challenge4_ciphers.txt")
+    inp_file = os.path.join(INPUT_FILES, "4.txt")
     with open(inp_file, "r") as f:
         inps = f.read().splitlines()
     inps = [bytes.fromhex(inp) for inp in inps]
@@ -60,7 +60,7 @@ def hd():
 
 def p6():
     # break repeating key xor
-    inp_file = os.path.join(INPUT_FILES, "challenge6_cipher.txt")
+    inp_file = os.path.join(INPUT_FILES, "6.txt")
     inp = ""
     with open(inp_file, "r") as f:
         inps = f.read().splitlines()
@@ -73,7 +73,7 @@ def p6():
 
 def p7():
     # decrypt AES-128 ECB
-    inp_file = os.path.join(INPUT_FILES, "challenge7_cipher.txt")
+    inp_file = os.path.join(INPUT_FILES, "7.txt")
     inp = ""
     with open(inp_file, "r") as f:
         inps = f.read().splitlines()
@@ -86,7 +86,7 @@ def p7():
 
 def p8():
     # detect AES-128 ECB
-    inp_file = os.path.join(INPUT_FILES, "challenge8_ciphers.txt")
+    inp_file = os.path.join(INPUT_FILES, "8.txt")
     with open(inp_file, "r") as f:
         inps = f.read().splitlines()
     inps = [bytes.fromhex(inp) for inp in inps]

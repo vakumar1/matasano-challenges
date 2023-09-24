@@ -60,7 +60,7 @@ def int_to_bytes(i, length=0):
         if i == 0:
             length = 1
         else:
-            length = math.ceil(math.log(i, 16))
+            length = math.ceil(math.log(i, 16)) + 1
     return int.to_bytes(i, length, "big")
 
 def int_to_bytes_little_end(i, length=0):
