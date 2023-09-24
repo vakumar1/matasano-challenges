@@ -140,15 +140,14 @@ class DHReceiverNegotiated(DHReceiver):
         return self.B
     
 class DHMITM_g:
-    def __init__(self, g_fn, injected_A, s):
-        # parameterize attack by g_fn (computes injected g as a function of p), value to inject as A, resulting secret
-        self.g_fn = g_fn
-        self.A = injected_A
-        self.s = s
+    def __init__(self, fn):
+        # parameterize attack by fn (computes injected g, injected A, and s as a function of p)
+        self.fn = fn
 
     def inject_init_msg_sender(self, p, g):
         self.p = p
-        return p, self.g_fn(p)
+        self.g, self.A, self.s = self.fn(p)
+        return p, self.g
     
     def inject_init_msg2_sender(self, A):
         return self.A

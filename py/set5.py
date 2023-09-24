@@ -49,10 +49,11 @@ def p3():
 
     # attack 1: g = 1 --> A = 1, s = 1
     # attack 2: g = p --> A = 0, s = 0
-    for attack_args in [(lambda p: 1, 1, 1), (lambda p: p, 0, 0)]:
+    # for attack_args in [(lambda p: 1, 1, 1), (lambda p: p, 0, 0)]:
+    for attack_fn in [lambda p: (1, 1, 1), lambda p: (p, 0, 0)]:
         s = pk.DHSenderNegotiated()
         r = pk.DHReceiverNegotiated()
-        m = pk.DHMITM_g(*attack_args)
+        m = pk.DHMITM_g(attack_fn)
         s.handle_init_msg(r.init_msg2(m.inject_init_msg2_sender(s.init_msg2(r.init_msg(*m.inject_init_msg_sender(*s.init_msg()))))))
         
         sender_data = s.data_msg(msg)
@@ -61,7 +62,7 @@ def p3():
         mitm_data2 = m.decrypt_intercepted_msg(receiver_data)
         correct = s.verify_data_msg(receiver_data)
 
-        print(f"MITM DH msg exchange attack: g = {attack_args[1]}")
+        print(f"MITM DH msg exchange attack: g = {m.g}")
         print("MITM DH msg exchange: verified: ", s.data == msg and correct)
         print("MITM DH msg exchange: attack succeeded: ", mitm_data1 == msg)
 
@@ -69,7 +70,7 @@ def p3():
     while True:
         s = pk.DHSenderNegotiated()
         r = pk.DHReceiverNegotiated()
-        m = pk.DHMITM_g(lambda p: p - 1, 1, 1)
+        m = pk.DHMITM_g(lambda p: (p - 1, p - 1, p - 1))
         s.handle_init_msg(r.init_msg2(m.inject_init_msg2_sender(s.init_msg2(r.init_msg(*m.inject_init_msg_sender(*s.init_msg()))))))
         
         # we always guess A = 1 (so the recever has s = 1) --> retry when the sender has s = p - 1
@@ -91,7 +92,7 @@ def p3():
             mitm_data2 = None
 
         # try s = p - 1
-        m.s = m.p - 1
+        m.s = 1
         try:
             alt_mitm_data1 = m.decrypt_intercepted_msg(sender_data)
             alt_mitm_data2 = m.decrypt_intercepted_msg(receiver_data)
