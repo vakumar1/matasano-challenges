@@ -49,7 +49,6 @@ def p3():
 
     # attack 1: g = 1 --> A = 1, s = 1
     # attack 2: g = p --> A = 0, s = 0
-    # for attack_args in [(lambda p: 1, 1, 1), (lambda p: p, 0, 0)]:
     for attack_fn in [lambda p: (1, 1, 1), lambda p: (p, 0, 0)]:
         s = pk.DHSenderNegotiated()
         r = pk.DHReceiverNegotiated()
@@ -106,13 +105,23 @@ def p3():
         print("MITM DH msg exchange: attack succeeded: ", mitm_data1 == msg or alt_mitm_data1 == msg)
         return
 
-
+def p4():
+    email = utils.ascii_to_bytes("hash@berkeley.edu")
+    password = utils.ascii_to_bytes("fubar123")
+    s = pk.SRPServer()
+    c = pk.SRPClient(email, password)
+    c.recv_params(*s.send_params())
+    s.recv_new_email(*c.send_new_email())
+    c.handle_auth_init(*s.recv_auth_init(*c.send_auth_init()))
+    valid = s.recv_auth_req(*c.send_auth_req())
+    print("SRP Protocol: valid auth request: ", valid)
 
 def main():
     functions = {
         "1": p1,
         "2": p2,
-        "3": p3
+        "3": p3,
+        "4": p4
     }
 
     if len(sys.argv) < 2:

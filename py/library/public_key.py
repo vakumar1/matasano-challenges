@@ -3,7 +3,7 @@ import library.mac as mac
 import library.utilities as utils
 
 import secrets
-import hashlib
+import hashlib, hmac
 
 ###############################
 # DIFFIE-HELLMAN KEY EXCHANGE #
@@ -162,3 +162,89 @@ class DHMITM_g:
         data = utils.remove_pkcs7_pad(aes.aes_cbc_decrypt(encr_data, encr_key, sender_iv), aes.BLOCK_SIZE)
         return data
     
+#######
+# SRP #
+#######
+
+class SRPServer:
+    def __init__(self):
+        self.p, self.g, self.k = DEF_P, DEF_G, 3
+        self.data = {}
+    
+    def send_params(self):
+        return self.p, self.g, self.k
+    
+    def recv_new_email(self, email, password):
+        salt = secrets.token_bytes(16)
+        hash = hashlib.sha256()
+        hash.update(salt + password)
+        xH = hash.digest()
+        x = utils.bytes_to_int(xH)
+        v = mod_exp(self.g, x, self.p)
+        self.data[email] = {
+            "salt": salt,
+            "v": v,
+        }
+
+    def recv_auth_init(self, email, A):
+        salt = self.data[email]["salt"]
+        v = self.data[email]["v"]
+        b = secrets.randbelow(self.p)
+        B = (self.k * v + mod_exp(self.g, b, self.p)) % self.p
+
+        hash = hashlib.sha256()
+        hash.update(utils.int_to_bytes(A + B))
+        uH = hash.digest()
+        u = utils.bytes_to_int(uH)
+        S = mod_exp(A * mod_exp(v, u, self.p), b, self.p)
+        hash = hashlib.sha256()
+        hash.update(utils.int_to_bytes(S))
+        K = hash.digest()
+        self.data[email]["K"] = K
+
+        return salt, B
+    
+    def recv_auth_req(self, email, hash):
+        K = self.data[email]["K"]
+        salt = self.data[email]["salt"]
+        mac = hmac.HMAC(K, digestmod=hashlib.sha256)
+        mac.update(salt)
+        return mac.digest() == hash
+
+
+class SRPClient:
+    def __init__(self, email, password):
+        self.email, self.password = email, password
+
+    def recv_params(self, p, g, k):
+        self.p, self.g, self.k = p, g, k
+
+    def send_new_email(self):
+        return self.email, self.password
+    
+    def send_auth_init(self):
+        self.a = secrets.randbelow(self.p)
+        self.A = mod_exp(self.g, self.a, self.p)
+        return self.email, self.A
+    
+    def handle_auth_init(self, salt, B):
+        self.salt = salt
+        hash = hashlib.sha256()
+        hash.update(utils.int_to_bytes(self.A + B))
+        uH = hash.digest()
+        u = utils.bytes_to_int(uH)
+
+        hash = hashlib.sha256()
+        hash.update(salt + self.password)
+        xH = hash.digest()
+        x = utils.bytes_to_int(xH)
+
+        S = mod_exp(B - self.k * mod_exp(self.g, x, self.p), self.a + u * x, self.p)
+        hash = hashlib.sha256()
+        hash.update(utils.int_to_bytes(S))
+        self.K = hash.digest()
+
+    def send_auth_req(self):
+        mac = hmac.HMAC(self.K, digestmod=hashlib.sha256)
+        mac.update(self.salt)
+        return self.email, mac.digest()
