@@ -248,3 +248,28 @@ class SRPClient:
         mac = hmac.HMAC(self.K, digestmod=hashlib.sha256)
         mac.update(self.salt)
         return self.email, mac.digest()
+
+
+class MaliciousSRPClient:
+    # malicious client needs to know params beforehand
+    def __init__(self, p, g, k):
+        self.p, self.g, self.k = p, g, k
+
+    def send_auth_init(self, victim_email):
+        self.email = victim_email
+        return victim_email, 0
+    
+    def handle_auth_init(self, salt, B):
+        self.salt = salt
+        S = 0
+        hash = hashlib.sha256()
+        hash.update(utils.int_to_bytes(S))
+        self.K = hash.digest()
+
+    def send_auth_req(self):
+        mac = hmac.HMAC(self.K, digestmod=hashlib.sha256)
+        mac.update(self.salt)
+        return self.email, mac.digest()
+    
+
+

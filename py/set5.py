@@ -116,12 +116,26 @@ def p4():
     valid = s.recv_auth_req(*c.send_auth_req())
     print("SRP Protocol: valid auth request: ", valid)
 
+def p5():
+    email = utils.ascii_to_bytes("hash@berkeley.edu")
+    password = utils.ascii_to_bytes("fubar123")
+    s = pk.SRPServer()
+    c = pk.SRPClient(email, password)
+    c.recv_params(*s.send_params())
+    s.recv_new_email(*c.send_new_email())
+
+    m = pk.MaliciousSRPClient(s.p, s.g, s.k)
+    m.handle_auth_init(*s.recv_auth_init(*m.send_auth_init(email)))
+    valid = s.recv_auth_req(*m.send_auth_req())
+    print("SRP with A=0: valid auth request: ", valid)
+
 def main():
     functions = {
         "1": p1,
         "2": p2,
         "3": p3,
-        "4": p4
+        "4": p4,
+        "5": p5
     }
 
     if len(sys.argv) < 2:
