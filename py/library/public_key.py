@@ -271,5 +271,127 @@ class MaliciousSRPClient:
         mac.update(self.salt)
         return self.email, mac.digest()
     
+############################
+# DICTIONARY ATTACK ON SRP #
+############################
+class SimpleSRPServer:
+    def __init__(self):
+        self.p, self.g = DEF_P, DEF_G
+        self.data = {}
+
+    def send_params(self):
+        return self.p, self.g
+
+    def recv_new_email(self, email, password):
+        salt = secrets.token_bytes(16)
+        hash = hashlib.sha256()
+        hash.update(salt + password)
+        xH = hash.digest()
+        x = utils.bytes_to_int(xH)
+        v = mod_exp(self.g, x, self.p)
+        self.data[email] = {
+            "salt": salt,
+            "v": v
+        }
+
+    def recv_auth_init(self, email, A):
+        salt = self.data[email]["salt"]
+        v = self.data[email]["v"]
+        b = secrets.randbelow(self.p)
+        u = utils.bytes_to_int(secrets.token_bytes(16))
+        B = mod_exp(self.g, b, self.p)
+
+        S = mod_exp(A * mod_exp(v, u, self.p), b, self.p)
+        hash = hashlib.sha256()
+        hash.update(utils.int_to_bytes(S))
+        K = hash.digest()
+        self.data[email]["K"] = K
+
+        return salt, B, u
+    
+    def recv_auth_req(self, email, hash):
+        K = self.data[email]["K"]
+        salt = self.data[email]["salt"]
+        mac = hmac.HMAC(K, digestmod=hashlib.sha256)
+        mac.update(salt)
+        return mac.digest() == hash
+
+class MITMSimpleSRPServer:
+    def __init__(self, p, g):
+        self.p, self.g = p, g
+
+    def recv_auth_init(self, email, A):
+        self.salt = secrets.token_bytes(16)
+        self.b = secrets.randbelow(self.p)
+        self.u = utils.bytes_to_int(secrets.token_bytes(16))
+        B = mod_exp(self.g, self.b, self.p)
+
+        # store auth init data for MITM server
+        self.A = A
+
+        return self.salt, B, self.u
+
+    # dictionary attack on client's hmac
+    def recv_auth_req(self, email, hash):
+        salt = self.salt
+        A = self.A
+        b = self.b
+        u = self.u
+
+        def password_valid(password):
+            xhash = hashlib.sha256()
+            xhash.update(salt + password)
+            xH = xhash.digest()
+            x = utils.bytes_to_int(xH)
+            v = mod_exp(self.g, x, self.p)
+            S = mod_exp(A * mod_exp(v, u, self.p), b, self.p)
+            shash = hashlib.sha256()
+            shash.update(utils.int_to_bytes(S))
+            K = shash.digest()
+            mac = hmac.HMAC(K, digestmod=hashlib.sha256)
+            mac.update(salt)
+            return mac.digest() == hash
+
+        # assume password is 8 bytes long
+        for i in range(8 ** 16):
+            password = utils.int_to_bytes(i, 8)
+            if password_valid(password):
+                return password
+        return bytearray()
+
+    
+class SimpleSRPClient:
+    def __init__(self, email, password):
+        self.email, self.password = email, password
+
+    def recv_params(self, p, g):
+        self.p, self.g = p, g
+
+    def send_new_email(self):
+        return self.email, self.password
+
+    def send_auth_init(self):
+        self.a = secrets.randbelow(self.p)
+        self.A = mod_exp(self.g, self.a, self.p)
+        return self.email, self.A
+
+    def handle_auth_init(self, salt, B, u):
+        self.salt = salt
+        hash = hashlib.sha256()
+        hash.update(salt + self.password)
+        xH = hash.digest()
+        x = utils.bytes_to_int(xH)
+        S = mod_exp(B, self.a + u * x, self.p)
+        hash = hashlib.sha256()
+        hash.update(utils.int_to_bytes(S))
+        self.K = hash.digest()
+    
+    def send_auth_req(self):
+        mac = hmac.HMAC(self.K, digestmod=hashlib.sha256)
+        mac.update(self.salt)
+        return self.email, mac.digest()
+
+
+    
 
 

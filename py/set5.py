@@ -129,13 +129,37 @@ def p5():
     valid = s.recv_auth_req(*m.send_auth_req())
     print("SRP with A=0: valid auth request: ", valid)
 
+def p6():
+    # test simple SRP works with valid server + client
+    email = utils.ascii_to_bytes("hash@berkeley.edu")
+    password = utils.int_to_bytes(42, 8)
+    s = pk.SimpleSRPServer()
+    c = pk.SimpleSRPClient(email, password)
+    c.recv_params(*s.send_params())
+    s.recv_new_email(*c.send_new_email())
+    c.handle_auth_init(*s.recv_auth_init(*c.send_auth_init()))
+    valid = s.recv_auth_req(*c.send_auth_req())
+    print("Simpler SRP Protocol: valid auth request=", valid)
+
+    # use MITM + dictionary attack to get user password
+    s = pk.SimpleSRPServer()
+    c = pk.SimpleSRPClient(email, password)
+    c.recv_params(*s.send_params())
+    s.recv_new_email(*c.send_new_email())
+
+    m = pk.MITMSimpleSRPServer(s.p, s.g)
+    c.handle_auth_init(*m.recv_auth_init(*c.send_auth_init()))
+    password = m.recv_auth_req(*c.send_auth_req())
+    print("Simpler SRP Protocol MITM + dictionary attack: password=", utils.bytes_to_int(password))
+
 def main():
     functions = {
         "1": p1,
         "2": p2,
         "3": p3,
         "4": p4,
-        "5": p5
+        "5": p5,
+        "6": p6,
     }
 
     if len(sys.argv) < 2:
