@@ -4,6 +4,7 @@ import library.utilities as utils
 
 import secrets
 import hashlib, hmac
+from Crypto.Util import number
 
 ###############################
 # DIFFIE-HELLMAN KEY EXCHANGE #
@@ -392,6 +393,50 @@ class SimpleSRPClient:
         return self.email, mac.digest()
 
 
+#######
+# RSA #
+#######
+
+def egcd(b, a):
+    if a < b:
+        b = b % a
+    r0 = a
+    r1 = b
+    s0, t0 = 1, 0
+    s1, t1 = 0, 1
+    while True:
+        q = r0 // r1
+        new_r = r0 % r1
+        new_s = s0 - q * s1
+        new_t = t0 - q * t1
+        r0, r1 = r1, new_r
+        s0, s1 = s1, new_s
+        t0, t1 = t1, new_t
+        if new_r == 0:
+            break
+    if r0 != 1:
+        raise ValueError("Trying to take modular inverse of noncoprime numbers.")
+    return t0
     
+def rsa_gen_params():
+    p = number.getPrime(1024)
+    while p % 3 != 2:
+        p = number.getPrime(1024)
+    q = number.getPrime(1024)
+    while q % 3 != 2:
+        q = number.getPrime(1024)
+    N = p * q
+    et = (p - 1) * (q - 1)
+    e = 3
+    d = (egcd(e, et)) % et
+    return (N, e), (N, d)
+
+def rsa_encrypt(m, public_key):
+    N, e = public_key
+    return mod_exp(m, e, N)
+
+def rsa_decrypt(c, private_key):
+    N, d = private_key
+    return mod_exp(c, d, N)
 
 

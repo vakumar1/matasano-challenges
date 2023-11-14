@@ -1,6 +1,7 @@
 import library.public_key as pk
 import library.utilities as utils
 
+from Crypto.Util import number
 import sys
 
 def p1():
@@ -152,6 +153,21 @@ def p6():
     password = m.recv_auth_req(*c.send_auth_req())
     print("Simpler SRP Protocol MITM + dictionary attack: password=", utils.bytes_to_int(password))
 
+def p7():
+    # test mult inverse
+    p1 = number.getPrime(1024)
+    p2 = number.getPrime(1024)
+    p1, p2 = max(p1, p2), min(p1, p2)
+    i = pk.egcd(p1, p2)
+    print(f"Mult inverse successful: {(p1 * i) % p2 == 1}")
+
+    # test RSA encrypt/decrypt
+    m = utils.bytes_to_int(utils.ascii_to_bytes("This is the message."))
+    public_key, private_key = pk.rsa_gen_params()
+    c = pk.rsa_encrypt(m, public_key)
+    m_d = pk.rsa_decrypt(c, private_key)
+    print(f"Decryption successful: {m == m_d}")
+
 def main():
     functions = {
         "1": p1,
@@ -160,6 +176,7 @@ def main():
         "4": p4,
         "5": p5,
         "6": p6,
+        "7": p7,
     }
 
     if len(sys.argv) < 2:
