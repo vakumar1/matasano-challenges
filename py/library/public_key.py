@@ -439,4 +439,19 @@ def rsa_decrypt(c, private_key):
     N, d = private_key
     return mod_exp(c, d, N)
 
+##################
+# RSA CRT ATTACK #
+##################
 
+def break_rsa_crt(ciphers, public_keys):
+    c0, c1, c2 = ciphers
+    (N0, _), (N1, _), (N2, _) = public_keys
+    M = N0 * N1 * N2
+    M0 = N1 * N2
+    M1 = N0 * N2
+    M2 = N0 * N1
+    Y0 = egcd(M0, N0)
+    Y1 = egcd(M1, N1)
+    Y2 = egcd(M2, N2)
+    m_3 = c0 * (Y0 * M0) + c1 * (Y1 * M1) + c2 * (Y2 * M2)
+    return m_3

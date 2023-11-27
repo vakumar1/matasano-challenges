@@ -168,6 +168,17 @@ def p7():
     m_d = pk.rsa_decrypt(c, private_key)
     print(f"Decryption successful: {m == m_d}")
 
+def p8():
+    m = utils.bytes_to_int(utils.ascii_to_bytes("This is the message."))
+    public_key0, _ = pk.rsa_gen_params()
+    c0 = pk.rsa_encrypt(m, public_key0)
+    public_key1, _ = pk.rsa_gen_params()
+    c1 = pk.rsa_encrypt(m, public_key1)
+    public_key2, _ = pk.rsa_gen_params()
+    c2 = pk.rsa_encrypt(m, public_key2)
+    m_d_3 = pk.break_rsa_crt([c0, c1, c2], [public_key0, public_key1, public_key2])
+    print(f"CRT break successful: {m ** 3 == m_d_3}")
+
 def main():
     functions = {
         "1": p1,
@@ -177,6 +188,7 @@ def main():
         "5": p5,
         "6": p6,
         "7": p7,
+        "8": p8,
     }
 
     if len(sys.argv) < 2:
