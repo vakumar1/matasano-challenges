@@ -455,3 +455,31 @@ def break_rsa_crt(ciphers, public_keys):
     Y2 = egcd(M2, N2)
     m_3 = c0 * (Y0 * M0) + c1 * (Y1 * M1) + c2 * (Y2 * M2)
     return m_3
+
+###############################
+# BREAK RSA DECRYPTION ORACLE #
+###############################
+
+class RSADecryptionOracle:
+
+    def __init__(self):
+        self.decrypted = set()
+        self.public_key, self.private_key = rsa_gen_params()
+
+    def key(self):
+        return self.public_key
+
+    def decrypt(self, c):
+        if c in self.decrypted:
+            raise PermissionError("Duplicated ciphertext")
+        self.decrypted.add(c)
+        p = rsa_decrypt(c, self.private_key)
+        return p
+
+def break_rsa_oracle(c, oracle: RSADecryptionOracle):
+    N, e = oracle.key()
+    S = secrets.randbelow(N - 2) + 2
+    c_ = (mod_exp(S, e, N) * c) % N
+    p_ = oracle.decrypt(c_)
+    p = (p_ * egcd(S, N)) % N
+    return p
