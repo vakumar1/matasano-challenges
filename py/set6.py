@@ -25,7 +25,10 @@ def p2():
     print(f"Correct signature correctly verifies: {correct_verified}")
     print(f"Incorrect signature correctly does not verify: {incorrect_verified}")
 
-
+    m = utils.ascii_to_bytes("hi mom")
+    forged_signature = pk.create_forged_pkcs1_signature(m)
+    verified = pk.verify_rsa_signature_sha256(m, forged_signature, public_key)
+    print(f"Forged signature correctly verified: {verified}")
 
 def main():
     functions = {

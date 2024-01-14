@@ -397,7 +397,7 @@ class SimpleSRPClient:
 # RSA #
 #######
     
-RSA_MOD_BYTES = 128
+RSA_MOD_BYTES = 256
 
 def egcd(b, a):
     if a < b:
@@ -494,16 +494,16 @@ def break_rsa_oracle(c, oracle: RSADecryptionOracle):
 SHA_256_DER_ENC = bytes.fromhex("30 31 30 0d 06 09 60 86 48 01 65 03 04 02 01 05 00 04 20")
 SHA_256_HASH_BYTES = 32
 
-def pkcs1_message_hash_pad(message, modulus_bytes):
+def pkcs1_message_hash_pad(message):
     # get sha256 hash of message
     h = hashlib.sha256()
     h.update(message)
     message_hash = h.digest()
     assert len(message_hash) == SHA_256_HASH_BYTES
-    ff_bytes = modulus_bytes - (2 + 1 + len(SHA_256_DER_ENC) + len(message_hash))
+    ff_bytes = RSA_MOD_BYTES - (2 + 1 + len(SHA_256_DER_ENC) + len(message_hash))
     assert ff_bytes >= 0
 
-    # append padding (including signature) to message
+    # prepend padding to message hash
     padding = bytearray()
     padding += utils.NULL_BYTE
     padding += bytes.fromhex("01")
@@ -511,7 +511,7 @@ def pkcs1_message_hash_pad(message, modulus_bytes):
     padding += utils.NULL_BYTE
     padding += SHA_256_DER_ENC
     padding += message_hash
-    assert len(padding) == modulus_bytes
+    assert len(padding) == RSA_MOD_BYTES
     return padding
 
 def faulty_remove_pkcs1_message_hash_pad(padded_message):
@@ -553,7 +553,7 @@ def faulty_remove_pkcs1_message_hash_pad(padded_message):
     raise ValueError("Failed to parse pkcs1.5-padded message (or could not find OID for supported hash algo)")
 
 def rsa_sign_sha256(message, private_key):
-    padded_message_hash = pkcs1_message_hash_pad(message, RSA_MOD_BYTES)
+    padded_message_hash = pkcs1_message_hash_pad(message)
     signature = rsa_decrypt(utils.bytes_to_int(padded_message_hash), private_key)
     return signature
 
@@ -564,4 +564,42 @@ def verify_rsa_signature_sha256(message, signature, public_key):
     h.update(message)
     actual_message_hash = h.digest()
     return expected_message_hash == actual_message_hash
+
+def bounded_cube_root(low_bound, high_bound):
+    L = 0
+    M = 0
+    R = low_bound
+    while L < R - 1:
+        M = (L + R) // 2
+        cube_M = M * M * M
+        if cube_M >= low_bound and cube_M <= high_bound:
+            return M
+        elif cube_M < low_bound:
+            L = M
+        else:
+            R = M
+    return None
+
     
+def create_forged_pkcs1_signature(message):
+    # get sha256 hash of message
+    h = hashlib.sha256()
+    h.update(message)
+    message_hash = h.digest()
+
+    cube_signature = bytearray()
+    cube_signature += utils.NULL_BYTE
+    cube_signature += bytes.fromhex("01")
+    cube_signature += (0 * utils.ONE_BYTE) # prepend 0 FF bytes
+    cube_signature += utils.NULL_BYTE
+    cube_signature += SHA_256_DER_ENC
+    cube_signature += message_hash
+
+    remaining_bytes = RSA_MOD_BYTES - len(cube_signature) # 128 - 54 = 74 bytes remaining
+    low_cube_signature = cube_signature + remaining_bytes * utils.NULL_BYTE
+    high_cube_signature = cube_signature + remaining_bytes * utils.ONE_BYTE
+    signature = bounded_cube_root(utils.bytes_to_int(low_cube_signature), utils.bytes_to_int(high_cube_signature))
+    if not signature:
+        raise Exception("Failed to find value whose cube would produce an acceptable forged signature.")
+    return signature
+
