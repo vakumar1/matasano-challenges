@@ -396,6 +396,8 @@ class SimpleSRPClient:
 #######
 # RSA #
 #######
+    
+RSA_MOD_BYTES = 128
 
 def egcd(b, a):
     if a < b:
@@ -418,16 +420,16 @@ def egcd(b, a):
         raise ValueError("Trying to take modular inverse of noncoprime numbers.")
     return t0
     
-def rsa_gen_params():
-    p = number.getPrime(1024)
+def rsa_gen_params(e=3):
+    factor_mod_bits = RSA_MOD_BYTES * 4
+    p = number.getPrime(factor_mod_bits)
     while p % 3 != 2:
-        p = number.getPrime(1024)
-    q = number.getPrime(1024)
+        p = number.getPrime(factor_mod_bits)
+    q = number.getPrime(factor_mod_bits)
     while q % 3 != 2:
-        q = number.getPrime(1024)
+        q = number.getPrime(factor_mod_bits)
     N = p * q
     et = (p - 1) * (q - 1)
-    e = 3
     d = (egcd(e, et)) % et
     return (N, e), (N, d)
 
@@ -483,3 +485,99 @@ def break_rsa_oracle(c, oracle: RSADecryptionOracle):
     p_ = oracle.decrypt(c_)
     p = (p_ * egcd(S, N)) % N
     return p
+
+######################
+# PKCS1.5 MAC ATTACK #
+######################
+
+# ASN.1 DER encoding for sha256 hash digest
+SHA_256_DER_ENC = bytes.fromhex("30 31 30 0d 06 09 60 86 48 01 65 03 04 02 01 05 00 04 20")
+SHA_256_HASH_BYTES = 32
+
+def rsa_sign_sha256(m, private_key):
+    h = hashlib.sha256()
+    h.update(m)
+    rsa_m = h.digest()
+    signature = rsa_decrypt(utils.bytes_to_int(rsa_m), private_key)
+    return signature
+
+def verify_rsa_signature_sha256(m, signature, public_key):
+    h = hashlib.sha256()
+    h.update(m)
+    expected_rsa_m = h.digest()
+    try:
+        actual_rsa_m = utils.int_to_bytes(rsa_encrypt(signature, public_key), SHA_256_HASH_BYTES)
+    except OverflowError:
+        return False
+    return expected_rsa_m == actual_rsa_m
+
+def pkcs1_signature_pad(message, signature, modulus_bytes):
+    # get sha256 hash of signature
+    signature_bytes = utils.int_to_bytes(signature, modulus_bytes)
+    h = hashlib.sha256()
+    h.update(signature_bytes)
+    signature_hash = h.digest()
+    assert len(signature_hash) == SHA_256_HASH_BYTES
+    ff_bytes = modulus_bytes - (len(message) + 2 + 1 + len(SHA_256_DER_ENC) + len(signature_hash))
+    assert ff_bytes >= 0
+
+    # append padding (including signature) to message
+    padding = message
+    padding += utils.NULL_BYTE
+    padding += bytes.fromhex("01")
+    padding += (ff_bytes * utils.ONE_BYTE)
+    padding += utils.NULL_BYTE
+    padding += SHA_256_DER_ENC
+    padding += signature_hash
+    assert len(padding) == modulus_bytes
+    return padding
+
+def faulty_remove_pkcs1_mac_pad(padded_message):
+    
+    states = [
+        "START",
+        "FF_BYTES",
+        "TAIL",
+    ]
+    state = "START"
+    i = 0
+    buffer = bytearray()
+    sub_buffer = bytearray()
+    while i < len(padded_message):
+        if state == "START":
+            if padded_message[i:i + 1] == utils.NULL_BYTE and padded_message[i + 1:i + 2] == bytes.fromhex("01"):
+                state = "FF_BYTES"
+                sub_buffer += padded_message[i:i + 2]
+                i += 2
+            else:
+                state = "START"
+                buffer += padded_message[i:i + 1]
+                i += 1
+        elif state == "FF_BYTES":
+            if padded_message[i:i + 1] == utils.ONE_BYTE:
+                state = "FF_BYTES"
+                sub_buffer += padded_message[i:i + 1]
+                i += 1
+            elif padded_message[i:i + 1] == utils.NULL_BYTE:
+                state = "TAIL"
+                sub_buffer += padded_message[i:i + 1]
+                i += 1
+            else:
+                state = "START"
+                buffer += sub_buffer
+                i += 1
+        elif state == "TAIL":
+            # only verify for sha256 hash
+            der_bytes = padded_message[i:i + len(SHA_256_DER_ENC)]
+            if der_bytes == SHA_256_DER_ENC:
+                signature_hash = padded_message[(i + len(SHA_256_DER_ENC)):(i + len(SHA_256_DER_ENC)) + SHA_256_HASH_BYTES]
+                return (buffer, signature_hash)
+            else:
+                state = "START"
+                buffer += sub_buffer
+                i += 1
+    raise ValueError("Failed to parse pkcs1.5-padded message (or could not find OID for supported hash algo)")
+
+
+# def generate_valid_padded_message(message):
+    
