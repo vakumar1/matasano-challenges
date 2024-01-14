@@ -16,20 +16,16 @@ def p1():
     print(f"Decryption successful: {m == m_}. Decrypted message: {utils.bytes_to_ascii(utils.int_to_bytes(m_))}")
 
 def p2():
-    # test RSA signature algorithm
+    # test rsa signature (w/ pkcs1.5 padding)
     public_key, private_key = pk.rsa_gen_params(e=3)
     m = utils.ascii_to_bytes("This is the message.")
     signature = pk.rsa_sign_sha256(m, private_key)
-    signature_bytes = utils.int_to_bytes(signature, pk.RSA_MOD_BYTES)
-    h = hashlib.sha256()
-    h.update(signature_bytes)
-    signature_hash = h.digest()
-    print(f"RSA signing successful: {pk.verify_rsa_signature_sha256(m, signature, public_key)}")
+    correct_verified = pk.verify_rsa_signature_sha256(m, signature, public_key)
+    incorrect_verified = pk.verify_rsa_signature_sha256(utils.ascii_to_bytes("This is the incorrect message"), signature, public_key)
+    print(f"Correct signature correctly verifies: {correct_verified}")
+    print(f"Incorrect signature correctly does not verify: {incorrect_verified}")
 
-    # test pkcs1.5 padding + removal
-    padded_m = pk.pkcs1_signature_pad(m, signature, pk.RSA_MOD_BYTES)
-    ret_m, ret_signature_hash = pk.faulty_remove_pkcs1_mac_pad(padded_m)
-    print(f"PKCS1.5 padding successful: {signature_hash == ret_signature_hash}")
+
 
 def main():
     functions = {

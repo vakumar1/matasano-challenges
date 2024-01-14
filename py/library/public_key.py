@@ -494,45 +494,27 @@ def break_rsa_oracle(c, oracle: RSADecryptionOracle):
 SHA_256_DER_ENC = bytes.fromhex("30 31 30 0d 06 09 60 86 48 01 65 03 04 02 01 05 00 04 20")
 SHA_256_HASH_BYTES = 32
 
-def rsa_sign_sha256(m, private_key):
+def pkcs1_message_hash_pad(message, modulus_bytes):
+    # get sha256 hash of message
     h = hashlib.sha256()
-    h.update(m)
-    rsa_m = h.digest()
-    signature = rsa_decrypt(utils.bytes_to_int(rsa_m), private_key)
-    return signature
-
-def verify_rsa_signature_sha256(m, signature, public_key):
-    h = hashlib.sha256()
-    h.update(m)
-    expected_rsa_m = h.digest()
-    try:
-        actual_rsa_m = utils.int_to_bytes(rsa_encrypt(signature, public_key), SHA_256_HASH_BYTES)
-    except OverflowError:
-        return False
-    return expected_rsa_m == actual_rsa_m
-
-def pkcs1_signature_pad(message, signature, modulus_bytes):
-    # get sha256 hash of signature
-    signature_bytes = utils.int_to_bytes(signature, modulus_bytes)
-    h = hashlib.sha256()
-    h.update(signature_bytes)
-    signature_hash = h.digest()
-    assert len(signature_hash) == SHA_256_HASH_BYTES
-    ff_bytes = modulus_bytes - (len(message) + 2 + 1 + len(SHA_256_DER_ENC) + len(signature_hash))
+    h.update(message)
+    message_hash = h.digest()
+    assert len(message_hash) == SHA_256_HASH_BYTES
+    ff_bytes = modulus_bytes - (2 + 1 + len(SHA_256_DER_ENC) + len(message_hash))
     assert ff_bytes >= 0
 
     # append padding (including signature) to message
-    padding = message
+    padding = bytearray()
     padding += utils.NULL_BYTE
     padding += bytes.fromhex("01")
     padding += (ff_bytes * utils.ONE_BYTE)
     padding += utils.NULL_BYTE
     padding += SHA_256_DER_ENC
-    padding += signature_hash
+    padding += message_hash
     assert len(padding) == modulus_bytes
     return padding
 
-def faulty_remove_pkcs1_mac_pad(padded_message):
+def faulty_remove_pkcs1_message_hash_pad(padded_message):
     
     states = [
         "START",
@@ -541,43 +523,45 @@ def faulty_remove_pkcs1_mac_pad(padded_message):
     ]
     state = "START"
     i = 0
-    buffer = bytearray()
-    sub_buffer = bytearray()
     while i < len(padded_message):
         if state == "START":
             if padded_message[i:i + 1] == utils.NULL_BYTE and padded_message[i + 1:i + 2] == bytes.fromhex("01"):
                 state = "FF_BYTES"
-                sub_buffer += padded_message[i:i + 2]
                 i += 2
             else:
                 state = "START"
-                buffer += padded_message[i:i + 1]
                 i += 1
         elif state == "FF_BYTES":
             if padded_message[i:i + 1] == utils.ONE_BYTE:
                 state = "FF_BYTES"
-                sub_buffer += padded_message[i:i + 1]
                 i += 1
             elif padded_message[i:i + 1] == utils.NULL_BYTE:
                 state = "TAIL"
-                sub_buffer += padded_message[i:i + 1]
                 i += 1
             else:
                 state = "START"
-                buffer += sub_buffer
                 i += 1
         elif state == "TAIL":
             # only verify for sha256 hash
             der_bytes = padded_message[i:i + len(SHA_256_DER_ENC)]
             if der_bytes == SHA_256_DER_ENC:
-                signature_hash = padded_message[(i + len(SHA_256_DER_ENC)):(i + len(SHA_256_DER_ENC)) + SHA_256_HASH_BYTES]
-                return (buffer, signature_hash)
+                message_hash = padded_message[(i + len(SHA_256_DER_ENC)):(i + len(SHA_256_DER_ENC)) + SHA_256_HASH_BYTES]
+                return message_hash
             else:
                 state = "START"
-                buffer += sub_buffer
                 i += 1
     raise ValueError("Failed to parse pkcs1.5-padded message (or could not find OID for supported hash algo)")
 
+def rsa_sign_sha256(message, private_key):
+    padded_message_hash = pkcs1_message_hash_pad(message, RSA_MOD_BYTES)
+    signature = rsa_decrypt(utils.bytes_to_int(padded_message_hash), private_key)
+    return signature
 
-# def generate_valid_padded_message(message):
+def verify_rsa_signature_sha256(message, signature, public_key):
+    expected_padded_message_hash = utils.int_to_bytes(rsa_encrypt(signature, public_key), RSA_MOD_BYTES)
+    expected_message_hash = faulty_remove_pkcs1_message_hash_pad(expected_padded_message_hash)
+    h = hashlib.sha256()
+    h.update(message)
+    actual_message_hash = h.digest()
+    return expected_message_hash == actual_message_hash
     
