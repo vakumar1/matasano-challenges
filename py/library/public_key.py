@@ -603,3 +603,55 @@ def create_forged_pkcs1_signature(message):
         raise Exception("Failed to find value whose cube would produce an acceptable forged signature.")
     return signature
 
+#######
+# DSA #
+#######
+
+DSA_P = 0x800000000000000089e1855218a0e7dac38136ffafa72eda7859f2171e25e65eac698c1702578b07dc2a1076da241c76c62d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebeac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc871a584471bb1
+DSA_G = 0x5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119458fef538b8fa4046c8db53039db620c094c9fa077ef389b5322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a0470f5b64c36b625a097f1651fe775323556fe00b3608c887892878480e99041be601a62166ca6894bdd41a7054ec89f756ba9fc95302291
+DSA_Q = 0xf4f47f05794b256174bba6e9b396a7707e563c5b
+
+
+def dsa_gen_keys(g, p, q):
+    priv_key = 1 + secrets.randbelow(q - 1)
+    pub_key = mod_exp(g, priv_key, p)
+    return (priv_key, pub_key)
+
+def dsa_sign_message(m, priv_key, g, p, q):
+    k = 1 + secrets.randbelow(q - 1)
+    r = mod_exp(g, k, p) % q
+    k_inv = egcd(k, q)
+    h = hashlib.sha1()
+    h.update(m)
+    m_hash = h.digest()
+    m_hash_num = utils.bytes_to_int(m_hash)
+    s = ((m_hash_num + priv_key * r) * k_inv) % q
+    return (r, s)
+
+def dsa_verify_message(m, sig, pub_key, g, p, q):
+    (r, s) = sig
+    w = egcd(s, q)
+    h = hashlib.sha1()
+    h.update(m)
+    m_hash = h.digest()
+    m_hash_num = utils.bytes_to_int(m_hash)
+    u1 = (m_hash_num * w) % q
+    u2 = (r * w) % q
+    v = (mod_exp(g, u1, p) * mod_exp(pub_key, u2, p) % p) % q
+    return v == r
+
+##############################
+# DSA K PRIVATE KEY RECOVERY #
+##############################
+
+def dsa_recover_priv_key_from_k(m_hash_num, r_inv, s, k, g, p, q):
+    return ((s * k - m_hash_num) * r_inv) % q
+
+def dsa_recover_priv_key_brute_force_k(m_hash_num, sig, pub_key, g, p, q):
+    (r, s) = sig
+    r_inv = egcd(r, q)
+    for k in range(1 << 16):
+        priv_key_cand = dsa_recover_priv_key_from_k(m_hash_num, r_inv, s, k, g, p, q)
+        if mod_exp(g, priv_key_cand, p) == pub_key:
+            return priv_key_cand
+        

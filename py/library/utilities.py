@@ -203,19 +203,6 @@ def bytes_leftrotate(b, count):
     return int_to_bytes(rot, len(b))
 
 
-    inp_byte_len = len(b)
-    # upper_byte_cnt = math.ceil(count / 8)
-    # right_bitshift_cnt = upper_byte_cnt * 8 - count
-
-    # count = count % inp_bit_len
-    # upper_bytes = b[:upper_byte_cnt]
-    # new_b = b + upper_bytes
-    # new_b = bytes_to_int(new_b) >> right_bitshift_cnt
-    # new_b = int_to_bytes(new_b, inp_byte_len + upper_byte_cnt)
-    # new_b = new_b[-inp_byte_len:]
-    # return new_b
-
-
 def str_prob(x):
     # return the probability of PT X
     eng_str = bytes_to_ascii(x)
