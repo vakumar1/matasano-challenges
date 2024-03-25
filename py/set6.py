@@ -2,8 +2,12 @@ import library.public_key as pk
 import library.utilities as utils
 
 import hashlib
+import binascii
 
 import sys
+import os
+
+INPUT_FILES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "inputs")
 
 def p1():
     m = utils.bytes_to_int(utils.ascii_to_bytes("This is the message."))
@@ -48,12 +52,35 @@ def p3():
     priv_key = pk.dsa_recover_priv_key_brute_force_k(m_hash_num, sig, pub_key, pk.DSA_G, pk.DSA_P, pk.DSA_Q)
     print(f"Recovered DSA private key: {priv_key}")
 
+def p4():
+    inp_file = os.path.join(INPUT_FILES, "44.txt")
+    sigs = []
+    with open(inp_file, "r") as f:
+        inps = f.read().splitlines()
+        for i in range(len(inps) // 4):
+            msg = inps[4 * i][5:]
+            s = int(inps[4 * i + 1][3:])
+            r = int(inps[4 * i + 2][3:])
+            m_hash = int(inps[4 * i + 3][3:], 16)
+            sigs.append({
+                "sig": (r, s),
+                "m_hash": m_hash
+            })
+    
+    priv_key = pk.desa_recover_priv_key_repeated_k(sigs, pk.DSA_G, pk.DSA_P, pk.DSA_Q)
+    priv_key_hex_str = utils.int_to_hex_bytes(priv_key)
+    h = hashlib.sha1()
+    h.update(priv_key_hex_str)
+    priv_key_hash = utils.bytes_to_hex_str(h.digest())
+    print(f"Recovered DSA private key (hash): {priv_key_hash}")
+
 
 def main():
     functions = {
         "1": p1,
         "2": p2,
         "3": p3,
+        "4": p4,
     }
 
     if len(sys.argv) < 2:

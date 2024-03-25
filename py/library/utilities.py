@@ -1,5 +1,6 @@
 import base64
 import math
+import binascii
 
 NULL_BYTE = bytes.fromhex("00")
 ONE_BYTE = bytes.fromhex("FF")
@@ -42,6 +43,9 @@ def bytes_to_ascii(b):
     # convert bytes B to ASCII (if not possible -> empty string "")
     return b.decode("ASCII", "replace")
 
+def bytes_to_hex_str(b):
+    return binascii.hexlify(b)
+
 def ascii_to_bytes(s):
     # convert ASCII S to bytes
     return bytes(s, "ascii")
@@ -68,6 +72,9 @@ def int_to_bytes_little_end(i, length=0):
     if length == 0:
         length = math.ceil(math.log(i, 16))
     return int.to_bytes(i, length, "little")
+
+def int_to_hex_bytes(i):
+    return bytearray(hex(i)[2:], "utf8")
 
 #################
 # PROCESS BYTES #
