@@ -67,7 +67,8 @@ def p4():
                 "m_hash": m_hash
             })
     
-    priv_key = pk.desa_recover_priv_key_repeated_k(sigs, pk.DSA_G, pk.DSA_P, pk.DSA_Q)
+    public_key = 0x2d026f4bf30195ede3a088da85e398ef869611d0f68f0713d51c9c1a3a26c95105d915e2d8cdf26d056b86b8a7b85519b1c23cc3ecdc6062650462e3063bd179c2a6581519f674a61f1d89a1fff27171ebc1b93d4dc57bceb7ae2430f98a6a4d83d8279ee65d71c1203d2c96d65ebbf7cce9d32971c3de5084cce04a2e147821
+    priv_key = pk.desa_recover_priv_key_repeated_k(sigs, public_key, pk.DSA_G, pk.DSA_P, pk.DSA_Q)
     priv_key_hex_str = utils.int_to_hex_bytes(priv_key)
     h = hashlib.sha1()
     h.update(priv_key_hex_str)

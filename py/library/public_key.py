@@ -655,7 +655,7 @@ def dsa_recover_priv_key_brute_force_k(m_hash_num, sig, pub_key, g, p, q):
         if mod_exp(g, priv_key_cand, p) == pub_key:
             return priv_key_cand
         
-def desa_recover_priv_key_repeated_k(sigs, g, p, q):
+def desa_recover_priv_key_repeated_k(sigs, public_key, g, p, q):
     for (i, sig) in enumerate(sigs):
         for j in range(i):
             (r1, s1) = sigs[i]["sig"]
@@ -670,7 +670,6 @@ def desa_recover_priv_key_repeated_k(sigs, g, p, q):
             k = (m_diff * s_diff_inv) % q
             r1_inv = egcd(r1, q)
             r2_inv = egcd(r2, q)
-            priv_key_cand1 = dsa_recover_priv_key_from_k(m1, r1_inv, s1, k, g, p, q)
-            priv_key_cand2 = dsa_recover_priv_key_from_k(m2, r2_inv, s2, k, g, p, q)
-            if priv_key_cand1 == priv_key_cand2:
-                return priv_key_cand1
+            priv_key_cand = dsa_recover_priv_key_from_k(m1, r1_inv, s1, k, g, p, q)
+            if mod_exp(g, priv_key_cand, p) == public_key:
+                return priv_key_cand
