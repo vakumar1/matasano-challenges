@@ -3,6 +3,8 @@ import library.utilities as utils
 
 import hashlib
 import binascii
+import base64
+import math
 
 import sys
 import os
@@ -21,17 +23,17 @@ def p1():
 
 def p2():
     # test rsa signature (w/ pkcs1.5 padding)
-    public_key, private_key = pk.rsa_gen_params(e=3)
+    rsa_bits, public_key, private_key = pk.rsa_gen_params(factor_mod_bits=2048, e=3)
     m = utils.ascii_to_bytes("This is the message.")
-    signature = pk.rsa_sign_sha256(m, private_key)
-    correct_verified = pk.verify_rsa_signature_sha256(m, signature, public_key)
-    incorrect_verified = pk.verify_rsa_signature_sha256(utils.ascii_to_bytes("This is the incorrect message"), signature, public_key)
+    signature = pk.rsa_sign_sha256(m, rsa_bits, private_key)
+    correct_verified = pk.verify_rsa_signature_sha256(m, signature, rsa_bits, public_key)
+    incorrect_verified = pk.verify_rsa_signature_sha256(utils.ascii_to_bytes("This is the incorrect message"), signature, rsa_bits, public_key)
     print(f"Correct signature correctly verifies: {correct_verified}")
     print(f"Incorrect signature correctly does not verify: {incorrect_verified}")
 
     m = utils.ascii_to_bytes("hi mom")
-    forged_signature = pk.create_forged_pkcs1_signature(m)
-    verified = pk.verify_rsa_signature_sha256(m, forged_signature, public_key)
+    forged_signature = pk.create_forged_pkcs1_signature(m, rsa_bits)
+    verified = pk.verify_rsa_signature_sha256(m, forged_signature, rsa_bits, public_key)
     print(f"Forged signature correctly verified: {verified}")
 
 def p3():
@@ -75,6 +77,14 @@ def p4():
     priv_key_hash = utils.bytes_to_hex_str(h.digest())
     print(f"Recovered DSA private key (hash): {priv_key_hash}")
 
+def p5():
+    rsa_bits, pub_key, priv_key = pk.rsa_gen_params()
+    m = utils.bytes_to_int(base64.b64decode("VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=="))
+    # m = 35
+    c = pk.rsa_encrypt(m, pub_key)
+    oracle = pk.get_rsa_even_odd_oracle(priv_key)
+    dec_m = pk.break_rsa_even_odd_oracle(oracle, rsa_bits, pub_key, c)
+    print(f"Recovered plaintext message from RSA even/odd oracle: {dec_m}")
 
 def main():
     functions = {
@@ -82,6 +92,7 @@ def main():
         "2": p2,
         "3": p3,
         "4": p4,
+        "5": p5,
     }
 
     if len(sys.argv) < 2:

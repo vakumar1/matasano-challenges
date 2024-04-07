@@ -6,6 +6,8 @@ import secrets
 import hashlib, hmac
 from Crypto.Util import number
 
+from decimal import Decimal, getcontext
+
 ###############################
 # DIFFIE-HELLMAN KEY EXCHANGE #
 ###############################
@@ -396,8 +398,6 @@ class SimpleSRPClient:
 #######
 # RSA #
 #######
-    
-RSA_MOD_BYTES = 256
 
 def egcd(b, a):
     if a < b:
@@ -420,8 +420,7 @@ def egcd(b, a):
         raise ValueError("Trying to take modular inverse of noncoprime numbers.")
     return t0
     
-def rsa_gen_params(e=3):
-    factor_mod_bits = RSA_MOD_BYTES * 4
+def rsa_gen_params(factor_mod_bits=1024, e=3):
     p = number.getPrime(factor_mod_bits)
     while p % 3 != 2:
         p = number.getPrime(factor_mod_bits)
@@ -431,7 +430,7 @@ def rsa_gen_params(e=3):
     N = p * q
     et = (p - 1) * (q - 1)
     d = (egcd(e, et)) % et
-    return (N, e), (N, d)
+    return factor_mod_bits, (N, e), (N, d)
 
 def rsa_encrypt(m, public_key):
     N, e = public_key
@@ -466,7 +465,7 @@ class RSADecryptionOracle:
 
     def __init__(self):
         self.decrypted = set()
-        self.public_key, self.private_key = rsa_gen_params()
+        self.rsa_bits, self.public_key, self.private_key = rsa_gen_params()
 
     def key(self):
         return self.public_key
@@ -486,6 +485,34 @@ def break_rsa_oracle(c, oracle: RSADecryptionOracle):
     p = (p_ * egcd(S, N)) % N
     return p
 
+#######################
+# RSA EVEN/ODD ORACLE #
+#######################
+
+def get_rsa_even_odd_oracle(priv_key):
+    def oracle(c):
+        N, d = priv_key
+        m = rsa_decrypt(c, priv_key)
+        return m % 2 == 0
+    return oracle
+
+def break_rsa_even_odd_oracle(oracle, rsa_bits, pub_key, c):
+    rsa_bytes = rsa_bits // 8
+    def float_to_ascii(sum):
+        return utils.bytes_to_ascii(utils.int_to_bytes(int(sum), rsa_bytes * 2))
+
+    N, e = pub_key
+    getcontext().prec = 3000
+    curr_sum = Decimal(0)
+    for i in range(rsa_bits * 2 + 20):
+        coef = 2 ** (i + 1)
+        even = oracle((coef ** e) * c)
+        if not even:
+            curr_sum += Decimal(N) / Decimal(coef)
+        if i % 10 == 0:
+            print(i, float_to_ascii(curr_sum))
+    return float_to_ascii(curr_sum)
+
 ######################
 # PKCS1.5 MAC ATTACK #
 ######################
@@ -494,13 +521,14 @@ def break_rsa_oracle(c, oracle: RSADecryptionOracle):
 SHA_256_DER_ENC = bytes.fromhex("30 31 30 0d 06 09 60 86 48 01 65 03 04 02 01 05 00 04 20")
 SHA_256_HASH_BYTES = 32
 
-def pkcs1_message_hash_pad(message):
+def pkcs1_message_hash_pad(message, rsa_bits):
     # get sha256 hash of message
+    rsa_bytes = rsa_bits // 8
     h = hashlib.sha256()
     h.update(message)
     message_hash = h.digest()
     assert len(message_hash) == SHA_256_HASH_BYTES
-    ff_bytes = RSA_MOD_BYTES - (2 + 1 + len(SHA_256_DER_ENC) + len(message_hash))
+    ff_bytes = rsa_bytes - (2 + 1 + len(SHA_256_DER_ENC) + len(message_hash))
     assert ff_bytes >= 0
 
     # prepend padding to message hash
@@ -511,7 +539,7 @@ def pkcs1_message_hash_pad(message):
     padding += utils.NULL_BYTE
     padding += SHA_256_DER_ENC
     padding += message_hash
-    assert len(padding) == RSA_MOD_BYTES
+    assert len(padding) == rsa_bytes
     return padding
 
 def faulty_remove_pkcs1_message_hash_pad(padded_message):
@@ -552,13 +580,14 @@ def faulty_remove_pkcs1_message_hash_pad(padded_message):
                 i += 1
     raise ValueError("Failed to parse pkcs1.5-padded message (or could not find OID for supported hash algo)")
 
-def rsa_sign_sha256(message, private_key):
-    padded_message_hash = pkcs1_message_hash_pad(message)
+def rsa_sign_sha256(message, rsa_bits, private_key):
+    padded_message_hash = pkcs1_message_hash_pad(message, rsa_bits)
     signature = rsa_decrypt(utils.bytes_to_int(padded_message_hash), private_key)
     return signature
 
-def verify_rsa_signature_sha256(message, signature, public_key):
-    expected_padded_message_hash = utils.int_to_bytes(rsa_encrypt(signature, public_key), RSA_MOD_BYTES)
+def verify_rsa_signature_sha256(message, signature, rsa_bits, public_key):
+    rsa_bytes = rsa_bits // 8
+    expected_padded_message_hash = utils.int_to_bytes(rsa_encrypt(signature, public_key), rsa_bytes)
     expected_message_hash = faulty_remove_pkcs1_message_hash_pad(expected_padded_message_hash)
     h = hashlib.sha256()
     h.update(message)
@@ -581,7 +610,7 @@ def bounded_cube_root(low_bound, high_bound):
     return None
 
     
-def create_forged_pkcs1_signature(message):
+def create_forged_pkcs1_signature(message, rsa_bits):
     # get sha256 hash of message
     h = hashlib.sha256()
     h.update(message)
@@ -595,7 +624,8 @@ def create_forged_pkcs1_signature(message):
     cube_signature += SHA_256_DER_ENC
     cube_signature += message_hash
 
-    remaining_bytes = RSA_MOD_BYTES - len(cube_signature) # 128 - 54 = 74 bytes remaining
+    rsa_bytes = rsa_bits // 8
+    remaining_bytes = rsa_bytes - len(cube_signature) # 128 - 54 = 74 bytes remaining
     low_cube_signature = cube_signature + remaining_bytes * utils.NULL_BYTE
     high_cube_signature = cube_signature + remaining_bytes * utils.ONE_BYTE
     signature = bounded_cube_root(utils.bytes_to_int(low_cube_signature), utils.bytes_to_int(high_cube_signature))
