@@ -80,11 +80,30 @@ def p4():
 def p5():
     rsa_bits, pub_key, priv_key = pk.rsa_gen_params()
     m = utils.bytes_to_int(base64.b64decode("VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=="))
-    # m = 35
     c = pk.rsa_encrypt(m, pub_key)
     oracle = pk.get_rsa_even_odd_oracle(priv_key)
     dec_m = pk.break_rsa_even_odd_oracle(oracle, rsa_bits, pub_key, c)
     print(f"Recovered plaintext message from RSA even/odd oracle: {dec_m}")
+
+def p7():
+    rsa_bits, pub_key, priv_key = pk.rsa_gen_params(128)
+    modulus_bits = 2 * rsa_bits
+    m = utils.ascii_to_bytes("kick it, CC")
+    padded_m = utils.pkcs1_pad(m, modulus_bits // 8)
+    c = pk.rsa_encrypt(utils.bytes_to_int(padded_m), pub_key)
+    oracle = pk.generate_pkcs1_padding_oracle(modulus_bits, priv_key)
+    m_ = pk.pcks1_padding_attack(oracle, modulus_bits, pub_key, c)
+    print(f"Recovered plaintext message from Bleichenbacher attack on PKCS1 oracle: {utils.bytes_to_ascii(utils.int_to_bytes(m_, modulus_bits * 8))}")
+
+def p8():
+    rsa_bits, pub_key, priv_key = pk.rsa_gen_params(384)
+    modulus_bits = 2 * rsa_bits
+    m = utils.ascii_to_bytes("This is a much longer message than in p6")
+    padded_m = utils.pkcs1_pad(m, modulus_bits // 8)
+    c = pk.rsa_encrypt(utils.bytes_to_int(padded_m), pub_key)
+    oracle = pk.generate_pkcs1_padding_oracle(modulus_bits, priv_key)
+    m_ = pk.pcks1_padding_attack(oracle, modulus_bits, pub_key, c)
+    print(f"Recovered plaintext message from Bleichenbacher attack on PKCS1 oracle: {utils.bytes_to_ascii(utils.int_to_bytes(m_, modulus_bits * 8))}")
 
 def main():
     functions = {
@@ -93,6 +112,8 @@ def main():
         "3": p3,
         "4": p4,
         "5": p5,
+        "7": p7,
+        "8": p8,
     }
 
     if len(sys.argv) < 2:

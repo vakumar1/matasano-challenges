@@ -1,6 +1,7 @@
 import base64
 import math
 import binascii
+import secrets
 
 NULL_BYTE = bytes.fromhex("00")
 ONE_BYTE = bytes.fromhex("FF")
@@ -108,6 +109,12 @@ def remove_pkcs7_pad(b, block_size):
         if pad_byte != pad_count:
             raise ValueError("Invalid PKCS7 padding")
     return b[:-pad_count]
+
+def pkcs1_pad(b, total_bytes):
+    assert len(b) <= total_bytes - 3
+    padding_len = total_bytes - 3 - len(b)
+    padding_bytes = secrets.token_bytes(padding_len)
+    return NULL_BYTE + bytes.fromhex("02") + padding_bytes + NULL_BYTE + b
 
 #########
 # USERS #

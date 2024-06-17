@@ -5,6 +5,7 @@ import library.utilities as utils
 import secrets
 import hashlib, hmac
 from Crypto.Util import number
+import math
 
 from decimal import Decimal, getcontext
 
@@ -703,3 +704,126 @@ def desa_recover_priv_key_repeated_k(sigs, public_key, g, p, q):
             priv_key_cand = dsa_recover_priv_key_from_k(m1, r1_inv, s1, k, g, p, q)
             if mod_exp(g, priv_key_cand, p) == public_key:
                 return priv_key_cand
+
+#############################################
+# BLEICHENBACHER PKCS PADDING ORACLE ATTACK #
+#############################################
+
+def generate_pkcs1_padding_oracle(modulus_bits, private_key):
+    def oracle(c):
+        m = rsa_decrypt(c, private_key)
+        m_bytes = utils.int_to_bytes(m, modulus_bits // 8)
+        assert len(m_bytes) * 8 == modulus_bits
+        return m_bytes[0] == 0 and m_bytes[1] == 2
+    return oracle
+
+def pcks1_padding_attack(oracle, modulus_bits, public_key, cipher):
+    N, e = public_key
+    B = 2 ** (modulus_bits - 2 * 8)
+
+    # 1. select random s_0 until product c * RSA(s_0) is PKCS1-conforming
+    s0 = None
+    c0 = None
+    while True:
+        s0 = secrets.randbelow(N)
+        c0 = (cipher * (s0 ** e)) % N
+        if oracle(c0):
+            break
+    print(f"Init s0={s0}")
+    
+    i = 0
+    s_i = None
+    M_i = [(2 * B, 3 * B - 1)]
+    while True:
+        # 2. find s_1 that is PKCS1-conforming
+        if i == 0:
+            s = math.ceil(N / (3 * B))
+            while True:
+                c_1 = (c0 * (s ** e)) % N
+                if oracle(c_1):
+                    break
+                s += 1
+            s_i = s
+        else:
+            if len(M_i) == 1:
+                start, end_inc = M_i[0]
+                r = math.ceil(2 * (end_inc * s_i - 2 * B) // N)
+                s = None
+                while True:
+                    s_start = math.ceil((2 * B + r * N) // end_inc)
+                    s_end_inc = (3 * B + r * N) // start
+                    if (3 * B + r * N) % start == 0:
+                        s_end_inc -= 1
+                    r += 1
+                    if s_start >= s_end_inc:
+                        continue
+
+                    selected = False
+                    for s_inner in range(s_start, s_end_inc + 1):
+                        c_i = (c0 * (s_inner ** e)) % N
+                        if oracle(c_i):
+                            s = s_inner
+                            selected = True
+                            break
+                    if selected:
+                        break
+                s_i = s
+            else:
+                s = s_i + 1
+                while True:
+                    c_i = (c0 * (s ** e)) % N
+                    if (oracle(c_i)):
+                        break
+                    s += 1
+                s_i = s
+
+        print(f"i={i} Found s_i={s_i}")
+        i += 1
+
+        # 3: narrow search space M
+        new_unmerged_M = []
+        for interval in M_i:
+            start, end_inc = interval
+            r_start = (start * s_i - 3 * B + 1) // N
+            if (start * s_i - 3 * B + 1) % N != 0:
+                r_start += 1
+            r_end_inc = (end_inc * s_i - 2 * B) // N
+            # assert r_start <= r_end_inc
+            for r in range(r_start, r_end_inc + 1):
+                new_start_opt = (2 * B + r * N) // s_i
+                if (2 * B + r * N) % s_i != 0:
+                    new_start_opt += 1
+                new_end_opt = (3 * B - 1 + r * N) // s_i
+                new_start = max(start, new_start_opt)
+                new_end_inc = min(end_inc, new_end_opt)
+                new_unmerged_M.append((new_start, new_end_inc))
+        M_i = merge_intervals(new_unmerged_M)
+        print(f"Updated M={M_i}")
+
+        # 4: check if M has narrowed to a single number
+        if len(M_i) == 1:
+            start, end = M_i[0]
+            if start == end:
+                return (start * egcd(s0, N)) % N
+        
+def merge_intervals(M):
+    def sort_fn(tup):
+        start, end = tup
+        return start
+    if len(M) == 0:
+        return M
+    M.sort(key=sort_fn)
+    final_intervals = []
+    curr_start, curr_end = None, None
+    for interval in M:
+        if curr_start is None:
+            curr_start, curr_end = interval
+        else:
+            start, end = interval
+            if start > curr_end:
+                final_intervals.append((curr_start, curr_end))
+            else:
+                curr_end = end
+    if curr_start is not None:
+        final_intervals.append((curr_start, curr_end))
+    return final_intervals
