@@ -78,6 +78,28 @@ def p4():
     print(f"Recovered DSA private key (hash): {priv_key_hash}")
 
 def p5():
+    m1 = utils.ascii_to_bytes("Hello, world")
+    m2 = utils.ascii_to_bytes("Goodbye, world")
+
+    # g = 0
+    (_, pub_key) = pk.dsa_gen_keys(0, pk.DSA_P, pk.DSA_Q)
+    m1_num = utils.bytes_to_int(m1)
+    forged_sig1 = (0, m1_num % pk.DSA_Q)
+    print(f"M1 signature valid: {pk.dsa_verify_message(m1, forged_sig1, pub_key, 0, pk.DSA_P, pk.DSA_Q)}")
+    m2_num = utils.bytes_to_int(m2)
+    forged_sig2 = (0, m2_num % pk.DSA_Q)
+    print(f"M2 signature valid: {pk.dsa_verify_message(m2, forged_sig2, pub_key, 0, pk.DSA_P, pk.DSA_Q)}")
+
+    # g = p + 1
+    (_, pub_key) = pk.dsa_gen_keys(pk.DSA_P + 1, pk.DSA_P, pk.DSA_Q)
+    r = (pub_key % pk.DSA_P) % pk.DSA_Q
+    s = r % pk.DSA_Q
+    forged_sig = (r, s)
+    print(f"M1 signature valid: {pk.dsa_verify_message(m1, forged_sig, pub_key, pk.DSA_P + 1, pk.DSA_P, pk.DSA_Q)}")
+    print(f"M2 signature valid: {pk.dsa_verify_message(m2, forged_sig, pub_key, pk.DSA_P + 1, pk.DSA_P, pk.DSA_Q)}")
+
+
+def p6():
     rsa_bits, pub_key, priv_key = pk.rsa_gen_params()
     m = utils.bytes_to_int(base64.b64decode("VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=="))
     c = pk.rsa_encrypt(m, pub_key)
@@ -112,6 +134,7 @@ def main():
         "3": p3,
         "4": p4,
         "5": p5,
+        "6": p6,
         "7": p7,
         "8": p8,
     }
